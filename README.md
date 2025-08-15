@@ -1,6 +1,6 @@
-# 🚀 **RAG Starter Kit** - AI Document Intelligence
+# 🚀 **RAG Starter Kit**
 
-> **A simple, powerful RAG (Retrieval-Augmented Generation) application for chatting with your documents**
+**A simple, powerful RAG (Retrieval-Augmented Generation) application that supports Documents, Video and Audio formats**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -62,14 +62,6 @@ npm run dev:all
 
 **That's it!** Your RAG application will be running at `http://localhost:3000` (BE) and `http://localhost:5173/` (FE) 🎉
 
-## 🎯 **Features**
-
-- **📄 Multi-Format Support**: PDF, Word, Text, Images, Audio, Video
-- **🤖 AI-Powered Chat**: Ask questions about your documents
-- **🔍 Smart Search**: Find information by meaning, not just keywords
-- **📱 Beautiful UI**: Modern, responsive interface
-- **⚡ Fast**: Built with TypeScript and React 19
-
 ## 🏗️ **How It Works**
 
 1. **Upload** your documents
@@ -123,13 +115,6 @@ client/
 
 - **Video & Audio**: Videos are processed by extracting N key frames and audio transcript, then analyzed with GPT-4o and Whisper APIs
 - **Documents & Images**: PDFs/Word docs use text extraction, while images are analyzed with GPT-4o for OCR and visual content understanding
-
-## Configuration
-
-- **File Size Limit**: 10MB per document
-- **Supported Formats**: Text, PDF, Word documents
-- **Vector Search**: Top 3 most relevant documents used for context
-- **LLM Model**: Configurable via environment variables
 
 ## 📄 **License**
 

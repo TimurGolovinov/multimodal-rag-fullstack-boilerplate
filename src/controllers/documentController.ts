@@ -81,4 +81,23 @@ export class DocumentController {
       });
     }
   }
+
+  async deleteDocument(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const ok = await this.documentService.deleteDocument(id);
+      if (!ok) {
+        res.status(404).json({ success: false, message: "Document not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete document error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to delete document",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
 }

@@ -1,162 +1,120 @@
-# RAG Demo Server
+# 🚀 **RAG Starter Kit** - AI Document Intelligence
 
-A lightweight TypeScript Node.js server that demonstrates Retrieval-Augmented Generation (RAG) capabilities. This server allows you to upload documents, create vector embeddings, and chat with an LLM about the uploaded content.
+> **A simple, powerful RAG (Retrieval-Augmented Generation) application for chatting with your documents**
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
 
-- 📄 **Document Upload**: Support for text, PDF, and Word documents
-- 🔍 **Vector Search**: ChromaDB integration for semantic document search
-- 🤖 **LLM Chat**: OpenAI integration for intelligent document Q&A
-- 🚀 **Lightweight**: Built with Express.js and TypeScript
-- 📚 **RAG Pipeline**: Complete retrieval-augmented generation workflow
+## 🛠️ **Tech Stack**
 
-## Tech Stack
+- **Backend**: Node.js + Express + TypeScript
+- **Frontend**: React 19 + Vite
+- **AI**: OpenAI GPT models
+- **Vector DB**: ChromaDB
+- **File Processing**: Multi-modal support
 
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Vector Database**: ChromaDB (in-memory)
-- **LLM**: OpenAI GPT models
-- **Document Processing**: LangChain.js, pdf-parse, mammoth
-- **File Upload**: Multer
+---
 
-## Prerequisites
+## ✨ **What This Does**
 
-- Node.js 18+
-- npm or yarn
-- OpenAI API key
+Upload any document (PDF, Word, images, audio, video) and chat with an AI about its content. The AI will:
 
-## Installation
+- **Understand** your documents using advanced AI
+- **Answer questions** based on the document content
+- **Find relevant information** across multiple documents
+- **Provide context** from your uploaded files
 
-1. **Clone and install dependencies:**
+## **Purpose**
 
-   ```bash
-   npm install
-   ```
+- Boilerplate for quick prototyping and experimentation
+- Understanding the core architecture of RAG systems
+- Building upon for your own projects (The backend has a solid foundation but needs significant improvements in security, error handling, production readiness, and code quality before it's suitable for public release)
 
-2. **Set up environment variables:**
+## 🚀 **Quick Start**
 
-   ```bash
-   cp env.example .env
-   ```
-
-   Edit `.env` and add your OpenAI API key:
-
-   ```env
-   OPENAI_API_KEY=your_openai_api_key_here
-   OPENAI_MODEL=gpt-3.5-turbo
-   PORT=3000
-   NODE_ENV=development
-   CHROMA_PERSIST_DIRECTORY=./chroma_db
-   ```
-
-3. **Build the project:**
-   ```bash
-   npm run build
-   ```
-
-## Usage
-
-### Development Mode
+### **1. Clone and Setup**
 
 ```bash
-npm run dev
+git clone https://github.com/yourusername/rag-starter-kit.git
+cd rag-starter-kit
+npm install
+npm install --prefix client
 ```
 
-### Production Mode
+### **2. Configure Environment**
 
 ```bash
+cp env.example .env
+# IMPORTANT: Edit .env and add your OpenAI API key
+```
+
+### **3. Start the Application**
+
+```bash
+# Start all services
+npm run dev:all
+
+# Or use the quick start script
+./quickstart.sh
+```
+
+**That's it!** Your RAG application will be running at `http://localhost:3000` (BE) and `http://localhost:5173/` (FE) 🎉
+
+## 🎯 **Features**
+
+- **📄 Multi-Format Support**: PDF, Word, Text, Images, Audio, Video
+- **🤖 AI-Powered Chat**: Ask questions about your documents
+- **🔍 Smart Search**: Find information by meaning, not just keywords
+- **📱 Beautiful UI**: Modern, responsive interface
+- **⚡ Fast**: Built with TypeScript and React 19
+
+## 🏗️ **How It Works**
+
+1. **Upload** your documents
+2. **AI processes** and understands the content
+3. **Ask questions** about your documents
+4. **Get intelligent answers** with source references
+
+## 📚 **API Reference**
+
+### **Core Endpoints**
+
+```http
+POST /api/documents/upload    # Upload any file type
+GET  /api/documents          # List all documents
+POST /api/chat/chat          # Chat with AI about documents
+GET  /health                 # Health check
+```
+
+See [API.md](API.md) for complete documentation.
+
+## 🔧 **Development**
+
+```bash
+# Start development server
+npm run dev:all
+
+# Build for production
 npm run build
 npm start
+
+# Client only
+npm run client
 ```
 
-The server will start on `http://localhost:3000` (or your configured PORT).
-
-## API Endpoints
-
-### Documents
-
-#### Upload Document
-
-```http
-POST /api/documents/upload
-Content-Type: multipart/form-data
-
-document: [file]
-```
-
-**Supported file types**: `.txt`, `.pdf`, `.docx`
-
-#### List Documents
-
-```http
-GET /api/documents
-```
-
-#### Get Document
-
-```http
-GET /api/documents/:id
-```
-
-### Chat
-
-#### Chat with LLM
-
-```http
-POST /api/chat/chat
-Content-Type: application/json
-
-{
-  "message": "What is this document about?",
-  "documentIds": ["optional-specific-document-ids"]
-}
-```
-
-### Health Check
-
-```http
-GET /health
-```
-
-## Example Usage
-
-### 1. Upload a Document
-
-```bash
-curl -X POST http://localhost:3000/api/documents/upload \
-  -F "document=@/path/to/your/document.pdf"
-```
-
-### 2. Chat About Documents
-
-```bash
-curl -X POST http://localhost:3000/api/chat/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Summarize the main points from the uploaded documents"}'
-```
-
-### 3. List All Documents
-
-```bash
-curl http://localhost:3000/api/documents
-```
-
-## Project Structure
+## 📁 **Project Structure**
 
 ```
 src/
-├── controllers/          # HTTP request handlers
-│   ├── documentController.ts
-│   └── chatController.ts
+├── controllers/          # API endpoints
 ├── services/            # Business logic
-│   ├── documentService.ts
-│   └── chatService.ts
-├── routes/              # API route definitions
-│   ├── documentRoutes.ts
-│   └── chatRoutes.ts
-├── types/               # TypeScript type definitions
-│   └── index.ts
-└── index.ts             # Main server file
+├── routes/              # Route definitions
+└── types/               # TypeScript types
+
+client/
+└── src/                 # React frontend
 ```
 
 ## How RAG Works
@@ -168,6 +126,11 @@ src/
 5. **Retrieval**: Most relevant documents are found using vector similarity
 6. **Generation**: LLM generates answers using retrieved document context
 
+## 📋 **Processing Details**
+
+- **Video & Audio**: Videos are processed by extracting N key frames and audio transcript, then analyzed with GPT-4o and Whisper APIs
+- **Documents & Images**: PDFs/Word docs use text extraction, while images are analyzed with GPT-4o for OCR and visual content understanding
+
 ## Configuration
 
 - **File Size Limit**: 10MB per document
@@ -175,47 +138,6 @@ src/
 - **Vector Search**: Top 3 most relevant documents used for context
 - **LLM Model**: Configurable via environment variables
 
-## Development
+## 📄 **License**
 
-### Scripts
-
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build TypeScript to JavaScript
-- `npm start` - Start production server
-- `npm test` - Run tests
-
-### Adding New Features
-
-- Controllers handle HTTP requests
-- Services contain business logic
-- Routes define API endpoints
-- Types ensure type safety
-
-## Troubleshooting
-
-### Common Issues
-
-1. **ChromaDB Connection Error**: Ensure the `CHROMA_PERSIST_DIRECTORY` exists and is writable
-2. **OpenAI API Errors**: Verify your API key and billing status
-3. **File Upload Issues**: Check file size limits and supported formats
-4. **Memory Issues**: Large documents may consume significant memory during processing
-
-### Logs
-
-Check console output for detailed error messages and debugging information.
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
----
-
-Built with ❤️ for RAG demonstrations and learning purposes.
+MIT License - see [LICENSE](LICENSE) file for details.

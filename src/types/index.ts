@@ -3,7 +3,40 @@ export interface Document {
   filename: string;
   content: string;
   uploadedAt: Date;
+  type: "text" | "image" | "audio" | "video" | "pdf" | "word";
   metadata?: Record<string, any>;
+  thumbnail?: string | null; // Base64 encoded thumbnail for videos/images
+}
+
+export interface ImageAnalysis {
+  description: string;
+  extractedText?: string;
+  chartData?: any;
+  confidence: number;
+}
+
+export interface AudioAnalysis {
+  transcript: string;
+  language?: string;
+  duration?: number;
+  confidence: number;
+}
+
+export interface VideoAnalysis {
+  visualSummary: string;
+  audioTranscript: string;
+  keyMoments: string[];
+  duration: number;
+  frameCount: number;
+  combinedContent: string;
+  confidence: number;
+  thumbnail?: string | null; // Base64 encoded thumbnail
+}
+
+export interface ProcessingProgress {
+  stage: "extracting" | "analyzing" | "synthesizing";
+  progress: number;
+  message: string;
 }
 
 export interface ChatMessage {

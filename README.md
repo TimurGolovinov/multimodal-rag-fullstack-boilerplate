@@ -11,7 +11,7 @@
 
 - **Backend**: Node.js + Express + TypeScript
 - **Frontend**: React 19 + Vite
-- **AI**: OpenAI GPT models
+- **AI**: OpenAI GPT models + Whisper
 - **Vector DB**: ChromaDB
 - **File Processing**: Multi-modal support
 
@@ -93,15 +93,8 @@ See [API.md](API.md) for complete documentation.
 ## 🔧 **Development**
 
 ```bash
-# Start development server
+# Start development server and client
 npm run dev:all
-
-# Build for production
-npm run build
-npm start
-
-# Client only
-npm run client
 ```
 
 ## 📁 **Project Structure**

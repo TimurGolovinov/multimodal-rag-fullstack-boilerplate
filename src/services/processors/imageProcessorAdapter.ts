@@ -21,7 +21,7 @@ export class ImageProcessorAdapter implements DocumentProcessor {
     buffer: Buffer,
     filename: string
   ): Promise<{ content: string; thumbnail?: string }> {
-    console.log(`Processing image "${filename}" with GPT-4o...`);
+    console.log(`Processing image "${filename}"...`);
     const result = await this.imageService.extractTextFromImage(
       buffer,
       filename

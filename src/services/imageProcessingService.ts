@@ -22,20 +22,21 @@ export class ImageProcessingService {
       const imageFormat = this.getImageFormat(filename);
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Analyze this image and provide:
-1. A detailed description of what you see
-2. Any text that appears in the image (OCR)
-3. If this is a chart, graph, or table, extract the data accurately
-4. Any relevant numerical information
+                text: `Analyze this image comprehensively and provide a detailed description that includes:
+1. What you see in the image (objects, people, scenes, etc.)
+2. Any text, numbers, or symbols visible in the image
+3. If this is a document, chart, or diagram, extract all relevant information
+4. Colors, layout, and visual composition
+5. Any business-relevant details (logos, brands, products, etc.)
 
-Please be thorough and accurate, especially with data extraction.`,
+Provide a thorough, searchable description that captures all the important visual information.`,
               },
               {
                 type: "image_url",
@@ -46,7 +47,6 @@ Please be thorough and accurate, especially with data extraction.`,
             ],
           },
         ],
-        max_tokens: 1000,
       });
 
       const analysis = response.choices[0]?.message?.content || "";
@@ -58,10 +58,10 @@ Please be thorough and accurate, especially with data extraction.`,
         description: result.description,
         extractedText: result.extractedText,
         chartData: result.chartData,
-        confidence: 0.9, // GPT-4V is generally very accurate
+        confidence: 0.9,
       };
     } catch (error) {
-      console.error("Error analyzing image with GPT-4V:", error);
+      console.error("Error analyzing image:", error);
       throw new Error(
         `Failed to analyze image: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -84,6 +84,42 @@ Please be thorough and accurate, especially with data extraction.`,
         return "webp";
       default:
         return "jpeg"; // fallback
+    }
+  }
+
+  /**
+   * Get a comprehensive text representation of the image for vector storage
+   */
+  async getImageTextRepresentation(
+    imageBuffer: Buffer,
+    filename: string
+  ): Promise<string> {
+    try {
+      const analysis = await this.analyzeImage(imageBuffer, filename);
+
+      // Create a comprehensive text representation
+      let textRepresentation = `Image Analysis for ${filename}:\n\n`;
+      textRepresentation += `Description: ${analysis.description}\n\n`;
+
+      if (analysis.extractedText) {
+        textRepresentation += `Extracted Text: ${analysis.extractedText}\n\n`;
+      }
+
+      if (analysis.chartData) {
+        textRepresentation += `Chart/Data Information: ${JSON.stringify(
+          analysis.chartData,
+          null,
+          2
+        )}\n\n`;
+      }
+
+      textRepresentation += `Analysis Confidence: ${analysis.confidence}`;
+
+      return textRepresentation;
+    } catch (error) {
+      console.error("Error getting image text representation:", error);
+      // Fallback to basic filename description
+      return `Image file: ${filename} - Unable to analyze content`;
     }
   }
 

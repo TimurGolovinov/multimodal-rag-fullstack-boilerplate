@@ -72,14 +72,42 @@ export class OpenAIVectorStore {
     content: string,
     metadata: Record<string, any>
   ): Promise<void> {
+    let file: any = null;
+
     try {
       if (!this.isInitialized || !this.vectorStoreId) {
         throw new Error("Vector store not initialized");
       }
 
+      // Validate content length
+      const contentLength = content.length;
+      if (contentLength === 0) {
+        throw new Error("Document content is empty");
+      }
+
+      console.log(
+        `Adding document "${metadata.filename}" with ${contentLength} characters`
+      );
+
+      // Show a preview of the content for debugging
+      const contentPreview = content.substring(
+        0,
+        Math.min(200, content.length)
+      );
+      console.log(`Content preview: "${contentPreview}..."`);
+
       // Create a file first, then add to vector store (simpler approach)
-      const file = await this.openai.files.create({
-        file: new File([content], metadata.filename, { type: "text/plain" }),
+      // For images, we need to use a .txt extension since we're storing text content
+      const filename = metadata.mimetype?.startsWith("image/")
+        ? `${metadata.filename.replace(/\.[^/.]+$/, "")}.txt`
+        : metadata.filename;
+
+      console.log(
+        `Using filename "${filename}" for OpenAI Files API (original: "${metadata.filename}")`
+      );
+
+      file = await this.openai.files.create({
+        file: new File([content], filename, { type: "text/plain" }),
         purpose: "assistants",
       });
 
@@ -103,8 +131,28 @@ export class OpenAIVectorStore {
           },
         },
       });
+
+      console.log(
+        `Successfully added document "${metadata.filename}" to vector store`
+      );
     } catch (error) {
       console.error("Failed to add document:", error);
+
+      // Clean up the file if vector store creation fails
+      if (file) {
+        try {
+          await this.openai.files.delete(file.id);
+          console.log(
+            `Cleaned up file ${file.id} after vector store creation failure`
+          );
+        } catch (cleanupError) {
+          console.error(
+            "Failed to clean up file after vector store creation failure:",
+            cleanupError
+          );
+        }
+      }
+
       throw error;
     }
   }

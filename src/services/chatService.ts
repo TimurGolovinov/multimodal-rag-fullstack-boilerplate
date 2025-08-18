@@ -30,7 +30,7 @@ export class ChatService {
 
       // Generate response using OpenAI
       const response = await this.openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
+        model: process.env.OPENAI_MODEL || "gpt-5-mini",
         messages: [
           {
             role: "system",

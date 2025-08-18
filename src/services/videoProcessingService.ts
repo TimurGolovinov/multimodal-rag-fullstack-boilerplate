@@ -7,7 +7,7 @@ import * as os from "os";
 
 export class VideoProcessingService {
   private openai: OpenAI;
-  private readonly maxFrames = 12; // Stay well under GPT-4o's image limit
+  private readonly maxFrames = 12;
   private readonly frameInterval = 5; // Extract frame every 5 seconds
   private videoCache = new Map<string, VideoAnalysis>(); // Simple cache for processed videos
   private ffmpegPath: string;
@@ -79,7 +79,7 @@ export class VideoProcessingService {
           message: `Extracted ${frames.length} frames`,
         });
 
-        // Process frames with GPT-4o
+        // Process frames
         onProgress?.({
           stage: "analyzing",
           progress: 60,
@@ -388,10 +388,10 @@ export class VideoProcessingService {
     keyMoments: string[];
   }> {
     try {
-      console.log(`Analyzing ${frames.length} frames with GPT-4o...`);
+      console.log(`Analyzing ${frames.length} frames...`);
 
       // Process frames in batches to stay under API limits
-      const batchSize = 10; // GPT-4o limit
+      const batchSize = 10;
       const batches = this.chunkArray(frames, batchSize);
 
       let allKeyMoments: string[] = [];
@@ -445,7 +445,7 @@ export class VideoProcessingService {
       const imageFormat = this.getVideoImageFormat(filename);
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "user",
@@ -471,7 +471,6 @@ Be concise but thorough. Focus on content that would be useful for search and re
             ],
           },
         ],
-        max_tokens: 800,
       });
 
       const analysis = response.choices[0]?.message?.content || "";
@@ -497,7 +496,7 @@ Be concise but thorough. Focus on content that would be useful for search and re
       const combinedDescriptions = frameDescriptions.join("\n\n");
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-mini",
         messages: [
           {
             role: "user",
@@ -514,7 +513,6 @@ Please create a coherent summary that:
 Keep it under 300 words but be thorough.`,
           },
         ],
-        max_tokens: 400,
       });
 
       return (
@@ -657,7 +655,7 @@ ${audioAnalysis.transcript}
 Video Metadata:
 Duration: ${timeString} | Frames Analyzed: ${visualAnalysis.keyMoments.length}
 
-This content has been processed using AI-powered video analysis combining real frame extraction with GPT-4o visual analysis and Whisper audio transcription for comprehensive searchability.`;
+This content has been processed using AI-powered video analysis combining real frame extraction with GPT-5-mini visual analysis and Whisper audio transcription for comprehensive searchability.`;
   }
 
   private parseFrameAnalysis(analysis: string): {

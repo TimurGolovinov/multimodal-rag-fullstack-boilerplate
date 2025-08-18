@@ -1,8 +1,7 @@
-import { Document, DocumentChunk } from "../types";
+import { Document } from "../types";
 import { v4 as uuidv4 } from "uuid";
 import { DocumentPersistence } from "./documentPersistence";
 import { OpenAIVectorStore } from "./openaiVectorStore";
-import { DocumentChunkingService } from "./documentChunkingService";
 
 // Define interfaces for document processors
 export interface DocumentProcessor {
@@ -23,9 +22,7 @@ export interface DocumentServiceConfig {
 
 export class DocumentService {
   private vectorStore: OpenAIVectorStore;
-  private chunkingService: DocumentChunkingService;
   private documents: Map<string, Document> = new Map();
-  private documentChunks: Map<string, DocumentChunk[]> = new Map();
   private persistence: DocumentPersistence;
 
   // Document processors injected via constructor
@@ -33,11 +30,10 @@ export class DocumentService {
 
   constructor(config?: DocumentServiceConfig) {
     console.log(
-      "Initializing DocumentService with persistent storage and configurable processors..."
+      "Initializing DocumentService with OpenAI vector store and configurable processors..."
     );
 
     this.vectorStore = new OpenAIVectorStore();
-    this.chunkingService = new DocumentChunkingService();
     this.persistence = new DocumentPersistence();
 
     // Add configured processors
@@ -58,7 +54,7 @@ export class DocumentService {
   private async initializeVectorStore() {
     try {
       await this.vectorStore.initialize();
-      console.log("OpenAI Vector Store initialized successfully");
+      // Vector store logs its own initialization status
     } catch (error) {
       console.error("Failed to initialize OpenAI Vector Store:", error);
       console.log("Server will continue without vector search capabilities");
@@ -102,45 +98,38 @@ export class DocumentService {
       thumbnail,
     };
 
-    // Store document in memory and persist to disk
-    this.documents.set(document.id, document);
-    this.persistence.saveDocuments(this.documents);
-
-    // Chunk the document and add to vector store
+    // Add document to OpenAI vector store first (automatic chunking)
     try {
-      const chunks = this.chunkingService.chunkDocument(
-        document.id,
-        document.content,
-        {
-          filename: document.filename,
-          uploadedAt: document.uploadedAt.toISOString(),
-          type: documentType,
-          document_id: document.id,
-          size: file.size,
-          mimetype: file.mimetype,
-        }
-      );
+      // Use regular upload for normal-sized documents
+      await this.vectorStore.addDocument(document.id, document.content, {
+        filename: document.filename,
+        uploadedAt: document.uploadedAt.toISOString(),
+        type: documentType,
+        document_id: document.id,
+        size: file.size,
+        mimetype: file.mimetype,
+      });
 
-      // Store chunks in memory
-      this.documentChunks.set(document.id, chunks);
-
-      // Add chunks to vector store
-      await this.vectorStore.addChunks(chunks);
-
-      // Log chunking statistics
-      const stats = this.chunkingService.getChunkingStats(chunks);
       console.log(
-        `Document "${document.filename}" (${documentType}) chunked into ${stats.totalChunks} chunks and indexed with OpenAI vector store`
+        `Document "${document.filename}" (${documentType}) added to OpenAI vector store with automatic chunking`
       );
-      console.log(`Chunking stats:`, stats);
+
+      // Only persist to disk and memory if vector store upload was successful
+      this.documents.set(document.id, document);
+      this.persistence.saveDocuments(this.documents);
+      console.log(
+        `Document "${document.filename}" successfully persisted to disk`
+      );
     } catch (error) {
       console.error(
         "Failed to index document with OpenAI vector store:",
         error
       );
       console.log(
-        `Document "${document.filename}" stored without vector indexing but persisted to disk`
+        `Document "${document.filename}" NOT persisted - vector store indexing failed`
       );
+      // Don't persist the document if vector store fails
+      throw error; // Re-throw to let the caller know the upload failed
     }
 
     return document;
@@ -157,13 +146,20 @@ export class DocumentService {
         return Array.from(this.documents.values()).slice(0, limit);
       }
 
-      const searchResults = await this.vectorStore.search(query, limit);
+      // Use advanced search with query rewriting enabled
+      const searchResults = await this.vectorStore.searchAdvanced(query, {
+        limit,
+        rewriteQuery: true,
+      });
 
+      console.log(
+        `Vector search found ${searchResults.length} relevant chunks`
+      );
       if (searchResults.length === 0) {
         return [];
       }
 
-      // Map search results back to documents using documentId from chunks
+      // Map search results back to documents using documentId from metadata
       const documentIds = new Set<string>();
       searchResults.forEach((result) => {
         if (result.metadata.document_id) {
@@ -171,10 +167,13 @@ export class DocumentService {
         }
       });
 
-      return Array.from(documentIds)
+      const foundDocuments = Array.from(documentIds)
         .map((id) => this.documents.get(id))
         .filter((doc): doc is Document => doc !== undefined)
         .slice(0, limit);
+
+      console.log(`Found ${foundDocuments.length} relevant documents`);
+      return foundDocuments;
     } catch (error) {
       console.error(
         "Vector search failed, falling back to all documents:",
@@ -196,46 +195,25 @@ export class DocumentService {
 
     // Remove from in-memory and persist
     this.documents.delete(id);
-    this.documentChunks.delete(id);
     this.persistence.saveDocuments(this.documents);
 
-    // Try to remove from vector store
+    // Try to remove from vector store and Files API
     try {
       if (this.vectorStore.isReady()) {
+        console.log(
+          `Deleting document ${id} from OpenAI vector store and Files API...`
+        );
         await this.vectorStore.deleteDocument(id);
+        console.log(`Successfully deleted document ${id} from OpenAI services`);
       }
     } catch (error) {
-      console.error(
-        "Failed to delete document from OpenAI vector store:",
-        error
-      );
+      console.error("Failed to delete document from OpenAI services:", error);
     }
 
     return true;
   }
 
-  /**
-   * Get chunks for a specific document
-   */
-  getDocumentChunks(documentId: string): DocumentChunk[] {
-    return this.documentChunks.get(documentId) || [];
-  }
-
-  /**
-   * Get chunking statistics for a document
-   */
-  getDocumentChunkingStats(documentId: string) {
-    const chunks = this.getDocumentChunks(documentId);
-    return this.chunkingService.getChunkingStats(chunks);
-  }
-
-  /**
-   * Get overall chunking statistics
-   */
-  getOverallChunkingStats() {
-    const allChunks = Array.from(this.documentChunks.values()).flat();
-    return this.chunkingService.getChunkingStats(allChunks);
-  }
+  // OpenAI vector store handles chunking automatically - no need for manual chunk management
 
   private getDocumentType(
     mimetype: string,

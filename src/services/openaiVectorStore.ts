@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { DocumentChunk } from "../types";
 
 export interface VectorStoreDocument {
   id: string;
@@ -16,15 +15,7 @@ export interface SearchResult {
 
 export class OpenAIVectorStore {
   private openai: OpenAI;
-  private chunks: Map<
-    string,
-    {
-      content: string;
-      metadata: Record<string, any>;
-      embedding: number[];
-      documentId: string;
-    }
-  > = new Map();
+  private vectorStoreId: string | null = null;
   private isInitialized: boolean = false;
 
   constructor() {
@@ -38,193 +29,296 @@ export class OpenAIVectorStore {
 
   async initialize(): Promise<void> {
     try {
+      // Check if we have an existing vector store
+      const vectorStores = await this.openai.vectorStores.list();
+
+      if (vectorStores.data.length > 0) {
+        // Use the first available vector store
+        this.vectorStoreId = vectorStores.data[0].id;
+        console.log(`Using existing vector store: ${this.vectorStoreId}`);
+      } else {
+        // Create a new vector store
+        const vectorStore = await this.openai.vectorStores.create({
+          name: "rag-documents",
+          expires_after: {
+            anchor: "last_active_at",
+            days: 30,
+          },
+          metadata: {
+            description: "Vector store for RAG document retrieval",
+            created_at: new Date().toISOString(),
+          },
+        });
+
+        this.vectorStoreId = vectorStore.id;
+        console.log(`Created new vector store: ${this.vectorStoreId}`);
+      }
+
       this.isInitialized = true;
-      console.log("OpenAI Vector Store (in-memory) initialized successfully");
+      console.log("OpenAI Vector Store initialized successfully");
     } catch (error) {
       console.error("Failed to initialize OpenAI Vector Store:", error);
       throw error;
     }
   }
 
-  async addDocuments(documents: VectorStoreDocument[]): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error("Vector store not initialized");
-    }
-
-    try {
-      // Create embeddings and store in memory
-      for (const doc of documents) {
-        const embedding = await this.createEmbedding(doc.content);
-        this.chunks.set(doc.id, {
-          content: doc.content,
-          metadata: doc.metadata,
-          embedding: embedding,
-          documentId: doc.id,
-        });
-      }
-
-      console.log(`Added ${documents.length} documents to vector store`);
-    } catch (error) {
-      console.error("Failed to add documents to vector store:", error);
-      throw error;
-    }
-  }
+  // OpenAI vector store handles document addition through addChunks method
 
   /**
-   * Add document chunks to the vector store
+   * Add a document to the vector store (OpenAI handles everything automatically)
    */
-  async addChunks(chunks: DocumentChunk[]): Promise<void> {
-    if (!this.isInitialized) {
-      throw new Error("Vector store not initialized");
-    }
-
+  async addDocument(
+    documentId: string,
+    content: string,
+    metadata: Record<string, any>
+  ): Promise<void> {
     try {
-      // Create embeddings for each chunk
-      for (const chunk of chunks) {
-        const embedding = await this.createEmbedding(chunk.content);
-        this.chunks.set(chunk.id, {
-          content: chunk.content,
-          metadata: chunk.metadata,
-          embedding: embedding,
-          documentId: chunk.documentId,
-        });
+      if (!this.isInitialized || !this.vectorStoreId) {
+        throw new Error("Vector store not initialized");
       }
 
-      console.log(`Added ${chunks.length} chunks to vector store`);
+      // Create a file first, then add to vector store (simpler approach)
+      const file = await this.openai.files.create({
+        file: new File([content], metadata.filename, { type: "text/plain" }),
+        purpose: "assistants",
+      });
+
+      // Add file to vector store with metadata and chunking strategy
+      await this.openai.vectorStores.files.create(this.vectorStoreId!, {
+        file_id: file.id,
+        attributes: {
+          document_id: documentId,
+          filename: metadata.filename,
+          type: metadata.type,
+          uploaded_at: metadata.uploadedAt,
+          size: metadata.size,
+          mimetype: metadata.mimetype,
+        },
+        // Optional: customize chunking strategy (using OpenAI defaults)
+        chunking_strategy: {
+          type: "static",
+          static: {
+            max_chunk_size_tokens: 800, // OpenAI default
+            chunk_overlap_tokens: 400, // OpenAI default
+          },
+        },
+      });
     } catch (error) {
-      console.error("Failed to add chunks to vector store:", error);
+      console.error("Failed to add document:", error);
       throw error;
     }
   }
 
   async search(query: string, limit: number = 5): Promise<SearchResult[]> {
-    if (!this.isInitialized) {
+    if (!this.isInitialized || !this.vectorStoreId) {
       throw new Error("Vector store not initialized");
     }
 
     try {
-      // Create query embedding
-      const queryEmbedding = await this.createEmbedding(query);
+      // Search with OpenAI's built-in features for better results
+      const searchResults = await this.openai.vectorStores.search(
+        this.vectorStoreId,
+        {
+          query,
+          max_num_results: limit,
+          // Enable query rewriting for better search results
+          rewrite_query: true,
+        }
+      );
 
-      // Calculate cosine similarity for all chunks
-      const results: Array<SearchResult & { similarity: number }> = [];
-
-      for (const [id, chunk] of this.chunks) {
-        const similarity = this.cosineSimilarity(
-          queryEmbedding,
-          chunk.embedding
-        );
-        results.push({
-          id,
-          content: chunk.content,
-          metadata: chunk.metadata,
-          score: similarity,
-          similarity,
-        });
-      }
-
-      // Sort by similarity and return top results
-      return results
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, limit)
-        .map(({ similarity, ...result }) => result);
+      // OpenAI already provides the content in the right format
+      return searchResults.data.map((result) => ({
+        id: result.file_id || "",
+        content: result.content?.map((c: any) => c.text).join("\n") || "",
+        metadata: {
+          ...result.attributes,
+          filename: result.filename,
+          score: result.score,
+        },
+        score: result.score || 0,
+      }));
     } catch (error) {
-      console.error("Failed to search vector store:", error);
+      console.error("Failed to search OpenAI vector store:", error);
       throw error;
     }
   }
 
   async deleteDocument(documentId: string): Promise<void> {
-    if (!this.isInitialized) {
+    if (!this.isInitialized || !this.vectorStoreId) {
       throw new Error("Vector store not initialized");
     }
 
     try {
-      // Delete all chunks belonging to this document
-      const chunksToDelete: string[] = [];
-      for (const [chunkId, chunk] of this.chunks) {
-        if (chunk.documentId === documentId) {
-          chunksToDelete.push(chunkId);
+      // List all files in the vector store
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+
+      // Find files that belong to this document
+      const filesToDelete: string[] = [];
+      for (const file of files.data) {
+        if (file.attributes?.document_id === documentId) {
+          filesToDelete.push(file.id);
         }
       }
 
-      chunksToDelete.forEach((chunkId) => this.chunks.delete(chunkId));
+      // Delete files from vector store AND from OpenAI Files API
+      for (const fileId of filesToDelete) {
+        try {
+          // First, delete from vector store
+          await this.openai.vectorStores.files.delete(fileId, {
+            vector_store_id: this.vectorStoreId,
+          });
+
+          // Then, delete the underlying file from OpenAI Files API
+          await this.openai.files.delete(fileId);
+
+          console.log(
+            `Deleted file ${fileId} from both vector store and Files API`
+          );
+        } catch (fileError) {
+          console.error(`Failed to delete file ${fileId}:`, fileError);
+          // Continue with other files even if one fails
+        }
+      }
+
       console.log(
-        `Deleted ${chunksToDelete.length} chunks for document ${documentId} from vector store`
+        `Deleted ${filesToDelete.length} files for document ${documentId} from OpenAI vector store and Files API`
       );
     } catch (error) {
-      console.error("Failed to delete document from vector store:", error);
+      console.error(
+        "Failed to delete document from OpenAI vector store:",
+        error
+      );
       throw error;
     }
   }
 
   async clearAll(): Promise<void> {
-    if (!this.isInitialized) {
+    if (!this.isInitialized || !this.vectorStoreId) {
       throw new Error("Vector store not initialized");
     }
 
     try {
-      this.chunks.clear();
-      console.log("Vector store cleared");
+      // List all files in the vector store
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+
+      // Delete all files from both vector store and Files API
+      for (const file of files.data) {
+        try {
+          // First, delete from vector store
+          await this.openai.vectorStores.files.delete(file.id, {
+            vector_store_id: this.vectorStoreId,
+          });
+
+          // Then, delete the underlying file from OpenAI Files API
+          await this.openai.files.delete(file.id);
+
+          console.log(
+            `Deleted file ${file.id} from both vector store and Files API`
+          );
+        } catch (fileError) {
+          console.error(`Failed to delete file ${file.id}:`, fileError);
+          // Continue with other files even if one fails
+        }
+      }
+
+      console.log("OpenAI vector store and Files API cleared");
     } catch (error) {
-      console.error("Failed to clear vector store:", error);
+      console.error("Failed to clear OpenAI vector store:", error);
       throw error;
     }
   }
 
-  private async createEmbedding(text: string): Promise<number[]> {
-    try {
-      const response = await this.openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: text,
-      });
-
-      return response.data[0].embedding;
-    } catch (error) {
-      console.error("Failed to create embedding:", error);
-      throw error;
-    }
-  }
-
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (vecA.length !== vecB.length) {
-      throw new Error("Vectors must have the same length");
-    }
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
-
-    if (normA === 0 || normB === 0) return 0;
-
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-  }
+  // OpenAI handles embeddings automatically when files are added to vector store
 
   isReady(): boolean {
     return this.isInitialized;
   }
 
-  getDocumentCount(): number {
-    return this.chunks.size;
-  }
-
-  getChunkCount(): number {
-    return this.chunks.size;
-  }
-
-  getDocumentChunkCount(documentId: string): number {
-    let count = 0;
-    for (const chunk of this.chunks.values()) {
-      if (chunk.documentId === documentId) {
-        count++;
-      }
+  async getDocumentCount(): Promise<number> {
+    if (!this.isInitialized || !this.vectorStoreId) {
+      return 0;
     }
-    return count;
+
+    try {
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+      return files.data.length;
+    } catch (error) {
+      console.error("Failed to get document count:", error);
+      return 0;
+    }
   }
+
+  async getChunkCount(): Promise<number> {
+    return this.getDocumentCount();
+  }
+
+  async getDocumentChunkCount(documentId: string): Promise<number> {
+    if (!this.isInitialized || !this.vectorStoreId) {
+      return 0;
+    }
+
+    try {
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+      let count = 0;
+      for (const file of files.data) {
+        if (file.attributes?.document_id === documentId) {
+          count++;
+        }
+      }
+      return count;
+    } catch (error) {
+      console.error("Failed to get document chunk count:", error);
+      return 0;
+    }
+  }
+
+  /**
+   * Advanced search with additional options
+   */
+  async searchAdvanced(
+    query: string,
+    options: {
+      limit?: number;
+      rewriteQuery?: boolean;
+    } = {}
+  ): Promise<SearchResult[]> {
+    if (!this.isInitialized || !this.vectorStoreId) {
+      throw new Error("Vector store not initialized");
+    }
+
+    try {
+      const searchResults = await this.openai.vectorStores.search(
+        this.vectorStoreId,
+        {
+          query,
+          max_num_results: options.limit || 5,
+          rewrite_query: options.rewriteQuery !== false, // Default to true
+        }
+      );
+
+      return searchResults.data.map((result) => ({
+        id: result.file_id || "",
+        content: result.content?.map((c: any) => c.text).join("\n") || "",
+        metadata: {
+          ...result.attributes,
+          filename: result.filename,
+          score: result.score,
+        },
+        score: result.score || 0,
+      }));
+    } catch (error) {
+      console.error("Failed to perform advanced search:", error);
+      throw error;
+    }
+  }
+
+  // OpenAI vector store handles persistence automatically
 }

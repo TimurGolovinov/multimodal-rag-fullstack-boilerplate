@@ -20,9 +20,13 @@ export class ChatService {
         request.message,
         3
       );
+      console.log("Relevant docs", relevantDocs);
 
-      // Create context from relevant documents
-      const context = this.createContext(relevantDocs);
+      // Format results and create context
+      const formattedResults = this.formatResults(relevantDocs);
+      const textSources = this.createContext(relevantDocs);
+      console.log("Formatted results", formattedResults);
+      console.log("Text sources", textSources);
 
       // Generate response using OpenAI
       const response = await this.openai.chat.completions.create({
@@ -30,26 +34,21 @@ export class ChatService {
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant that answers questions based on the provided documents. 
-            Use only the information from the documents to answer questions. 
-            If the documents don't contain relevant information, say so. 
-            Always cite which document(s) you used to answer the question.
-            
-            Context from documents:
-            ${context}`,
+            content:
+              "Produce a concise answer to the query based on the provided sources.",
           },
           {
             role: "user",
-            content: request.message,
+            content: `Sources: ${formattedResults}\n\nQuery: '${request.message}'`,
           },
         ],
-        max_tokens: 500,
-        temperature: 0.7,
       });
 
       const assistantMessage =
         response.choices[0]?.message?.content ||
         "Sorry, I could not generate a response.";
+
+      console.log("Completion response:", assistantMessage);
 
       return {
         message: assistantMessage,
@@ -61,7 +60,7 @@ export class ChatService {
     }
   }
 
-  private createContext(documents: Document[]): string {
+  private formatResults(documents: Document[]): string {
     if (documents.length === 0) {
       return "No relevant documents found.";
     }
@@ -69,11 +68,19 @@ export class ChatService {
     return documents
       .map(
         (doc, index) =>
-          `Document ${index + 1} (${doc.filename}):\n${doc.content.substring(
-            0,
-            500
-          )}...`
+          `Document ${index + 1} (${doc.filename}):\n${doc.content}`
       )
       .join("\n\n");
+  }
+
+  private createContext(documents: Document[]): string {
+    if (documents.length === 0) {
+      return "No relevant documents found.";
+    }
+
+    // Join the text content of all results
+    const textSources = documents.map((doc) => doc.content).join("\n");
+
+    return textSources;
   }
 }

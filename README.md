@@ -65,9 +65,20 @@ npm run dev:all
 ## 🏗️ **How It Works**
 
 1. **Upload** your documents
-2. **AI processes** and understands the content
-3. **Ask questions** about your documents
-4. **Get intelligent answers** with source references
+2. **AI processes** and understands the content using OpenAI's managed vector store
+3. **Documents are automatically chunked** and embedded for optimal retrieval
+4. **Ask questions** about your documents
+5. **Get intelligent answers** with semantic search and source references
+
+## 🔍 **Vector Store Implementation**
+
+This project uses **OpenAI's official Vector Store API** for production-ready document storage and retrieval:
+
+- **Managed Infrastructure**: No need to manage your own vector database
+- **Automatic Chunking**: Documents are intelligently split into searchable chunks
+- **Semantic Search**: Uses OpenAI's latest embedding models for context-aware retrieval
+- **Scalable**: Handles millions of documents with automatic indexing
+- **Cost-Effective**: Pay only for storage used (first 1GB free)
 
 ## 📚 **API Reference**
 
@@ -90,5 +101,7 @@ npm run dev:all
 ```
 
 ## 📁 **Project Structure**
+
+```
 
 ```

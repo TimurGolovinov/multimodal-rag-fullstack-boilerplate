@@ -12,7 +12,7 @@
 - **Backend**: Node.js + Express + TypeScript
 - **Frontend**: React 19 + Vite
 - **AI**: OpenAI GPT models + Whisper
-- **Vector DB**: ChromaDB
+- **Vector DB**: OpenAI Vector Store (managed)
 - **File Processing**: Multi-modal support
 
 ---
@@ -92,30 +92,3 @@ npm run dev:all
 ## 📁 **Project Structure**
 
 ```
-src/
-├── controllers/          # API endpoints
-├── services/            # Business logic
-├── routes/              # Route definitions
-└── types/               # TypeScript types
-
-client/
-└── src/                 # React frontend
-```
-
-## How RAG Works
-
-1. **Document Upload**: Documents are processed and text is extracted
-2. **Embedding Generation**: OpenAI embeddings are created for document content
-3. **Vector Storage**: Embeddings are stored in ChromaDB for similarity search
-4. **Query Processing**: User questions are converted to embeddings
-5. **Retrieval**: Most relevant documents are found using vector similarity
-6. **Generation**: LLM generates answers using retrieved document context
-
-## 📋 **Processing Details**
-
-- **Video & Audio**: Videos are processed by extracting N key frames and audio transcript, then analyzed with GPT-4o and Whisper APIs
-- **Documents & Images**: PDFs/Word docs use text extraction, while images are analyzed with GPT-4o for OCR and visual content understanding
-
-## 📄 **License**
-
-MIT License - see [LICENSE](LICENSE) file for details.

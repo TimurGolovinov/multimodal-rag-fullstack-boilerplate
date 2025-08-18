@@ -8,6 +8,24 @@ export interface Document {
   thumbnail?: string | null; // Base64 encoded thumbnail for videos/images
 }
 
+export interface DocumentChunk {
+  id: string;
+  documentId: string;
+  content: string;
+  chunkIndex: number;
+  startChar: number;
+  endChar: number;
+  metadata: Record<string, any>;
+  embedding?: number[];
+}
+
+export interface ChunkingConfig {
+  maxChunkSize: number;
+  overlapSize: number;
+  separator: string;
+  minChunkSize: number;
+}
+
 export interface ImageAnalysis {
   description: string;
   extractedText?: string;

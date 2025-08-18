@@ -1,9 +1,8 @@
-import { Document } from "../types";
-import { ChromaClient, Collection } from "chromadb";
-import { OpenAIEmbeddings } from "@langchain/openai";
+import { Document, DocumentChunk } from "../types";
 import { v4 as uuidv4 } from "uuid";
-import { ChromaManager } from "./chromaManager";
 import { DocumentPersistence } from "./documentPersistence";
+import { OpenAIVectorStore } from "./openaiVectorStore";
+import { DocumentChunkingService } from "./documentChunkingService";
 
 // Define interfaces for document processors
 export interface DocumentProcessor {
@@ -23,11 +22,10 @@ export interface DocumentServiceConfig {
 }
 
 export class DocumentService {
-  private client: ChromaClient;
-  private collection!: Collection;
-  private embeddings: OpenAIEmbeddings;
+  private vectorStore: OpenAIVectorStore;
+  private chunkingService: DocumentChunkingService;
   private documents: Map<string, Document> = new Map();
-  private chromaManager: ChromaManager;
+  private documentChunks: Map<string, DocumentChunk[]> = new Map();
   private persistence: DocumentPersistence;
 
   // Document processors injected via constructor
@@ -38,7 +36,8 @@ export class DocumentService {
       "Initializing DocumentService with persistent storage and configurable processors..."
     );
 
-    this.chromaManager = new ChromaManager();
+    this.vectorStore = new OpenAIVectorStore();
+    this.chunkingService = new DocumentChunkingService();
     this.persistence = new DocumentPersistence();
 
     // Add configured processors
@@ -48,18 +47,7 @@ export class DocumentService {
     if (config?.pdfProcessor) this.processors.push(config.pdfProcessor);
     if (config?.wordProcessor) this.processors.push(config.wordProcessor);
 
-    this.client = new ChromaClient({
-      host: "localhost",
-      port: 8000,
-      ssl: false,
-    });
-
-    this.embeddings = new OpenAIEmbeddings({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      modelName: "text-embedding-3-small",
-    });
-
-    this.initializeCollection();
+    this.initializeVectorStore();
     this.loadPersistedDocuments();
   }
 
@@ -67,22 +55,12 @@ export class DocumentService {
     this.documents = this.persistence.loadDocuments();
   }
 
-  private async initializeCollection() {
+  private async initializeVectorStore() {
     try {
-      // Ensure ChromaDB server is running
-      const chromaReady = await this.chromaManager.ensureChromaRunning();
-      if (!chromaReady) {
-        throw new Error("Failed to start ChromaDB server");
-      }
-
-      this.collection = await this.client.getOrCreateCollection({
-        name: "documents",
-        metadata: { "hnsw:space": "cosine" },
-      });
-
-      console.log("ChromaDB collection initialized successfully");
+      await this.vectorStore.initialize();
+      console.log("OpenAI Vector Store initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize ChromaDB collection:", error);
+      console.error("Failed to initialize OpenAI Vector Store:", error);
       console.log("Server will continue without vector search capabilities");
     }
   }
@@ -128,28 +106,38 @@ export class DocumentService {
     this.documents.set(document.id, document);
     this.persistence.saveDocuments(this.documents);
 
-    // Create embeddings and store in vector database
+    // Chunk the document and add to vector store
     try {
-      const embedding = await this.embeddings.embedQuery(content);
-      console.log("Embedding", embedding);
-      await this.collection.add({
-        ids: [document.id],
-        embeddings: [embedding],
-        metadatas: [
-          {
-            filename: document.filename,
-            uploadedAt: document.uploadedAt.toISOString(),
-            type: documentType,
-          },
-        ],
-        documents: [content],
-      });
-
-      console.log(
-        `Document "${document.filename}" (${documentType}) indexed with embeddings and persisted`
+      const chunks = this.chunkingService.chunkDocument(
+        document.id,
+        document.content,
+        {
+          filename: document.filename,
+          uploadedAt: document.uploadedAt.toISOString(),
+          type: documentType,
+          document_id: document.id,
+          size: file.size,
+          mimetype: file.mimetype,
+        }
       );
+
+      // Store chunks in memory
+      this.documentChunks.set(document.id, chunks);
+
+      // Add chunks to vector store
+      await this.vectorStore.addChunks(chunks);
+
+      // Log chunking statistics
+      const stats = this.chunkingService.getChunkingStats(chunks);
+      console.log(
+        `Document "${document.filename}" (${documentType}) chunked into ${stats.totalChunks} chunks and indexed with OpenAI vector store`
+      );
+      console.log(`Chunking stats:`, stats);
     } catch (error) {
-      console.error("Failed to index document with embeddings:", error);
+      console.error(
+        "Failed to index document with OpenAI vector store:",
+        error
+      );
       console.log(
         `Document "${document.filename}" stored without vector indexing but persisted to disk`
       );
@@ -164,26 +152,29 @@ export class DocumentService {
 
   async searchDocuments(query: string, limit: number = 5): Promise<Document[]> {
     try {
-      if (!this.collection) {
+      if (!this.vectorStore.isReady()) {
         console.log("Vector search disabled - returning all documents");
         return Array.from(this.documents.values()).slice(0, limit);
       }
 
-      const queryEmbedding = await this.embeddings.embedQuery(query);
-      console.log("Query embedding", queryEmbedding);
-      const results = await this.collection.query({
-        queryEmbeddings: [queryEmbedding],
-        nResults: limit,
-      });
-      console.log("Results", results);
-      if (!results.ids || results.ids.length === 0) {
+      const searchResults = await this.vectorStore.search(query, limit);
+
+      if (searchResults.length === 0) {
         return [];
       }
 
-      const documentIds = results.ids[0] as string[];
-      return documentIds
+      // Map search results back to documents using documentId from chunks
+      const documentIds = new Set<string>();
+      searchResults.forEach((result) => {
+        if (result.metadata.document_id) {
+          documentIds.add(result.metadata.document_id);
+        }
+      });
+
+      return Array.from(documentIds)
         .map((id) => this.documents.get(id))
-        .filter((doc): doc is Document => doc !== undefined);
+        .filter((doc): doc is Document => doc !== undefined)
+        .slice(0, limit);
     } catch (error) {
       console.error(
         "Vector search failed, falling back to all documents:",
@@ -205,18 +196,45 @@ export class DocumentService {
 
     // Remove from in-memory and persist
     this.documents.delete(id);
+    this.documentChunks.delete(id);
     this.persistence.saveDocuments(this.documents);
 
     // Try to remove from vector store
     try {
-      if (this.collection) {
-        await this.collection.delete({ ids: [id] });
+      if (this.vectorStore.isReady()) {
+        await this.vectorStore.deleteDocument(id);
       }
     } catch (error) {
-      console.error("Failed to delete document from ChromaDB:", error);
+      console.error(
+        "Failed to delete document from OpenAI vector store:",
+        error
+      );
     }
 
     return true;
+  }
+
+  /**
+   * Get chunks for a specific document
+   */
+  getDocumentChunks(documentId: string): DocumentChunk[] {
+    return this.documentChunks.get(documentId) || [];
+  }
+
+  /**
+   * Get chunking statistics for a document
+   */
+  getDocumentChunkingStats(documentId: string) {
+    const chunks = this.getDocumentChunks(documentId);
+    return this.chunkingService.getChunkingStats(chunks);
+  }
+
+  /**
+   * Get overall chunking statistics
+   */
+  getOverallChunkingStats() {
+    const allChunks = Array.from(this.documentChunks.values()).flat();
+    return this.chunkingService.getChunkingStats(allChunks);
   }
 
   private getDocumentType(

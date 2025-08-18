@@ -7,14 +7,10 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "chroma:start": "npx chromadb run --path ./chroma_db --port 8000",
-    "chroma:stop": "pkill -f 'chromadb run'",
-    "dev:full": "npm run chroma:start & sleep 3 && npm run dev",
-    "postinstall": "mkdir -p chroma_db",
     "client": "npm run dev --prefix client",
     "client:build": "npm run build --prefix client",
     "client:start": "npm run preview --prefix client",
-    "dev:all": "npm run chroma:start & npm run dev --prefix client & npm run dev"
+    "dev:all": "npm run dev --prefix client & npm run dev"
   },
   "keywords": [
     "rag",
@@ -26,18 +22,14 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@chroma-core/default-embed": "^0.1.8",
-    "@langchain/openai": "^0.0.14",
     "axios": "^1.6.2",
-    "chromadb": "^3.0.11",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "ffmpeg-static": "^5.2.0",
-    "langchain": "^0.0.208",
     "mammoth": "^1.6.0",
     "multer": "^1.4.5-lts.1",
-    "openai": "^4.20.1",
+    "openai": "^5.12.2",
     "pdf-parse": "^1.1.1",
     "uuid": "^9.0.1"
   },

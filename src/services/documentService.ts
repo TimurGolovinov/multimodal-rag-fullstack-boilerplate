@@ -1,14 +1,26 @@
 import { Document } from "../types";
 import { ChromaClient, Collection } from "chromadb";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import * as fs from "fs";
-import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { ChromaManager } from "./chromaManager";
 import { DocumentPersistence } from "./documentPersistence";
-import { ImageProcessingService } from "./imageProcessingService";
-import { AudioProcessingService } from "./audioProcessingService";
-import { VideoProcessingService } from "./videoProcessingService";
+
+// Define interfaces for document processors
+export interface DocumentProcessor {
+  canProcess(mimetype: string, filename: string): boolean;
+  extractText(
+    buffer: Buffer,
+    filename: string
+  ): Promise<{ content: string; thumbnail?: string }>;
+}
+
+export interface DocumentServiceConfig {
+  imageProcessor?: DocumentProcessor;
+  audioProcessor?: DocumentProcessor;
+  videoProcessor?: DocumentProcessor;
+  pdfProcessor?: DocumentProcessor;
+  wordProcessor?: DocumentProcessor;
+}
 
 export class DocumentService {
   private client: ChromaClient;
@@ -17,20 +29,25 @@ export class DocumentService {
   private documents: Map<string, Document> = new Map();
   private chromaManager: ChromaManager;
   private persistence: DocumentPersistence;
-  private imageProcessor: ImageProcessingService;
-  private audioProcessor: AudioProcessingService;
-  private videoProcessor: VideoProcessingService;
 
-  constructor() {
+  // Document processors injected via constructor
+  private processors: DocumentProcessor[] = [];
+
+  constructor(config?: DocumentServiceConfig) {
     console.log(
-      "Initializing DocumentService with persistent storage, image, audio, and video support..."
+      "Initializing DocumentService with persistent storage and configurable processors..."
     );
 
     this.chromaManager = new ChromaManager();
     this.persistence = new DocumentPersistence();
-    this.imageProcessor = new ImageProcessingService();
-    this.audioProcessor = new AudioProcessingService();
-    this.videoProcessor = new VideoProcessingService();
+
+    // Add configured processors
+    if (config?.imageProcessor) this.processors.push(config.imageProcessor);
+    if (config?.audioProcessor) this.processors.push(config.audioProcessor);
+    if (config?.videoProcessor) this.processors.push(config.videoProcessor);
+    if (config?.pdfProcessor) this.processors.push(config.pdfProcessor);
+    if (config?.wordProcessor) this.processors.push(config.wordProcessor);
+
     this.client = new ChromaClient({
       host: "localhost",
       port: 8000,
@@ -39,6 +56,7 @@ export class DocumentService {
 
     this.embeddings = new OpenAIEmbeddings({
       openAIApiKey: process.env.OPENAI_API_KEY,
+      modelName: "text-embedding-3-small",
     });
 
     this.initializeCollection();
@@ -72,28 +90,23 @@ export class DocumentService {
   async uploadDocument(file: Express.Multer.File): Promise<Document> {
     const content = await this.extractText(file);
     const documentType = this.getDocumentType(file.mimetype, file.originalname);
+    console.log("Document type", documentType);
 
-    // Extract thumbnail for video and image files
+    // Extract thumbnail if available
     let thumbnail: string | null = null;
-    if (documentType === "video") {
+    const processor = this.findProcessor(file.mimetype, file.originalname);
+    if (processor) {
       try {
-        const videoResult = await this.videoProcessor.extractTextFromVideo(
+        const result = await processor.extractText(
           file.buffer,
           file.originalname
         );
-        thumbnail = videoResult.thumbnail;
+        thumbnail = result.thumbnail || null;
       } catch (error) {
-        console.warn("Failed to extract video thumbnail:", error);
-      }
-    } else if (documentType === "image") {
-      try {
-        const imageResult = await this.imageProcessor.extractTextFromImage(
-          file.buffer,
-          file.originalname
+        console.warn(
+          `Failed to extract thumbnail from ${documentType}:`,
+          error
         );
-        thumbnail = imageResult.thumbnail;
-      } catch (error) {
-        console.warn("Failed to extract image thumbnail:", error);
       }
     }
 
@@ -118,7 +131,7 @@ export class DocumentService {
     // Create embeddings and store in vector database
     try {
       const embedding = await this.embeddings.embedQuery(content);
-
+      console.log("Embedding", embedding);
       await this.collection.add({
         ids: [document.id],
         embeddings: [embedding],
@@ -157,12 +170,12 @@ export class DocumentService {
       }
 
       const queryEmbedding = await this.embeddings.embedQuery(query);
-
+      console.log("Query embedding", queryEmbedding);
       const results = await this.collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: limit,
       });
-
+      console.log("Results", results);
       if (!results.ids || results.ids.length === 0) {
         return [];
       }
@@ -261,100 +274,39 @@ export class DocumentService {
     return "text"; // default fallback
   }
 
+  private findProcessor(
+    mimetype: string,
+    filename: string
+  ): DocumentProcessor | undefined {
+    return this.processors.find((processor) =>
+      processor.canProcess(mimetype, filename)
+    );
+  }
+
   private async extractText(file: Express.Multer.File): Promise<string> {
     const buffer = file.buffer;
+    console.log("Extracting text for file", file);
 
-    // Handle images using GPT-4o
-    if (file.mimetype.startsWith("image/")) {
-      console.log(`Processing image "${file.originalname}" with GPT-4o...`);
+    // Find appropriate processor
+    const processor = this.findProcessor(file.mimetype, file.originalname);
+    if (processor) {
       try {
-        const imageResult = await this.imageProcessor.extractTextFromImage(
-          buffer,
-          file.originalname
-        );
-        console.log(`Image processing completed for "${file.originalname}"`);
-
-        // Store thumbnail for later use
-        const thumbnail = imageResult.thumbnail;
-
-        return imageResult.content;
+        const result = await processor.extractText(buffer, file.originalname);
+        console.log(`Processing completed for "${file.originalname}"`);
+        return result.content;
       } catch (error) {
-        console.error(`Failed to process image "${file.originalname}":`, error);
+        console.error(`Failed to process "${file.originalname}":`, error);
         throw new Error(
-          `Image processing failed: ${
+          `Processing failed: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
       }
     }
 
-    // Handle audio using Whisper
-    if (
-      file.mimetype.startsWith("audio/") ||
-      this.audioProcessor.isAudioFile(file.originalname)
-    ) {
-      console.log(`Processing audio "${file.originalname}" with Whisper...`);
-      try {
-        const audioText = await this.audioProcessor.extractTextFromAudio(
-          buffer,
-          file.originalname
-        );
-        console.log(`Audio processing completed for "${file.originalname}"`);
-        return audioText;
-      } catch (error) {
-        console.error(`Failed to process audio "${file.originalname}":`, error);
-        throw new Error(
-          `Audio processing failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    }
-
-    // Handle video using optimized pipeline
-    if (
-      file.mimetype.startsWith("video/") ||
-      this.videoProcessor.isVideoFile(file.originalname)
-    ) {
-      console.log(
-        `Processing video "${file.originalname}" with optimized pipeline...`
-      );
-      try {
-        const videoResult = await this.videoProcessor.extractTextFromVideo(
-          buffer,
-          file.originalname
-        );
-        console.log(`Video processing completed for "${file.originalname}"`);
-
-        // Store thumbnail for later use
-        const thumbnail = videoResult.thumbnail;
-
-        return videoResult.content;
-      } catch (error) {
-        console.error(`Failed to process video "${file.originalname}":`, error);
-        throw new Error(
-          `Video processing failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    }
-
-    // Handle existing text-based formats
+    // Handle text-based formats directly
     if (file.mimetype === "text/plain") {
       return buffer.toString("utf-8");
-    }
-
-    if (file.mimetype === "application/pdf") {
-      const pdfParse = require("pdf-parse");
-      const data = await pdfParse(buffer);
-      return data.text;
-    }
-
-    if (file.mimetype.includes("word") || file.mimetype.includes("docx")) {
-      const mammoth = require("mammoth");
-      const result = await mammoth.extractRawText({ buffer });
-      return result.value;
     }
 
     throw new Error(`Unsupported file type: ${file.mimetype}`);

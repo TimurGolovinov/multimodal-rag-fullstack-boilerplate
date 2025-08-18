@@ -26,7 +26,7 @@ export class ChatService {
 
       // Generate response using OpenAI
       const response = await this.openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-3.5-turbo",
+        model: process.env.OPENAI_MODEL || "gpt-4o",
         messages: [
           {
             role: "system",

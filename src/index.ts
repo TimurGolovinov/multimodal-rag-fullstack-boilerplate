@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { DocumentService } from "./services/documentService";
+import { DocumentServiceFactory } from "./services/documentServiceFactory";
 import { ChatService } from "./services/chatService";
 import { DocumentController } from "./controllers/documentController";
 import { ChatController } from "./controllers/chatController";
@@ -19,8 +19,8 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Initialize services
-const documentService = new DocumentService();
+// Initialize services with all processors
+const documentService = DocumentServiceFactory.createWithAllProcessors();
 const chatService = new ChatService(documentService);
 
 // Initialize controllers

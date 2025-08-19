@@ -6,6 +6,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
 type Doc = {
   id: string;
   filename: string;
+  content: string;
   uploadedAt: string;
   type: "text" | "image" | "audio" | "video" | "pdf" | "word";
   metadata?: Record<string, unknown>;
@@ -423,6 +424,12 @@ function DocumentsPanel() {
                   <span className="document-separator">•</span>
                   {new Date(d.uploadedAt).toLocaleDateString()} •{" "}
                   {new Date(d.uploadedAt).toLocaleTimeString()}
+                </div>
+                {/* Document content preview - 3 rows with ellipsis */}
+                <div className="document-content-3rows" title={d.content}>
+                  {d.content.length > 300
+                    ? `${d.content.substring(0, 300)}...`
+                    : d.content}
                 </div>
               </div>
             </div>

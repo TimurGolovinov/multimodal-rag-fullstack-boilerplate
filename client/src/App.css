@@ -877,6 +877,19 @@ body {
 .document-item:hover .thumbnail-image {
   /* Hover effects removed */
 }
+.document-content-3rows {
+  padding: 0 0.25rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  max-width: 100%;
+  max-height: calc(1.4em * 3); /* Exactly 3 rows */
+}
 
 .document-icon {
   font-size: 1.5rem;

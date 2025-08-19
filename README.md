@@ -1,6 +1,6 @@
 # 🚀 **RAG Starter Kit**
 
-**A simple, powerful RAG (Retrieval-Augmented Generation) application that supports Documents, Video and Audio formats**
+**A simple, powerful RAG (Retrieval-Augmented Generation) application that supports Documents, Images, Video and Audio formats**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)

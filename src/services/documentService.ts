@@ -305,23 +305,39 @@ export class DocumentService {
       return buffer.toString("utf-8");
     }
 
-    // Handle images with Vision API analysis
-    if (file.mimetype.startsWith("image/")) {
+    // Handle media files (images, videos, audio) with appropriate processors
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("video/") ||
+      file.mimetype.startsWith("audio/")
+    ) {
       try {
-        const imageProcessor = this.processors.find((p) =>
-          p.canProcess("image/", file.originalname)
+        const mediaProcessor = this.processors.find((p) =>
+          p.canProcess(file.mimetype, file.originalname)
         );
-        if (imageProcessor && "getImageTextRepresentation" in imageProcessor) {
-          const textRepresentation = await (
-            imageProcessor as any
-          ).getImageTextRepresentation(buffer, file.originalname);
-          console.log(`Image analysis completed for "${file.originalname}"`);
-          return textRepresentation;
+        if (mediaProcessor) {
+          const result = await mediaProcessor.extractText(
+            buffer,
+            file.originalname
+          );
+          console.log(
+            `${file.mimetype.split("/")[0]} analysis completed for "${
+              file.originalname
+            }"`
+          );
+          return result.content;
         }
       } catch (error) {
-        console.error(`Failed to analyze image "${file.originalname}":`, error);
+        console.error(
+          `Failed to analyze ${file.mimetype.split("/")[0]} "${
+            file.originalname
+          }":`,
+          error
+        );
         // Fallback to basic description
-        return `Image file: ${file.originalname} - Content analysis failed`;
+        return `${file.mimetype.split("/")[0]} file: ${
+          file.originalname
+        } - Content analysis failed`;
       }
     }
 

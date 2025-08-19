@@ -2,6 +2,10 @@
 
 **A simple, powerful RAG (Retrieval-Augmented Generation) application that supports Documents, Images, Video and Audio formats**
 
+![RAG Demo Interface](client/public/uiDemo.png)
+
+_The RAG Demo interface showing chat functionality and document management with beautiful dark theme UI_
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)](https://nodejs.org/)

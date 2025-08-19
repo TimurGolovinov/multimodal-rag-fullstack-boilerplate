@@ -103,9 +103,3 @@ See [API.md](API.md) for complete documentation.
 # Start development server and client
 npm run dev:all
 ```
-
-## 📁 **Project Structure**
-
-```
-
-```

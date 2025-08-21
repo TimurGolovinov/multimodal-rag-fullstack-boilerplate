@@ -47,29 +47,15 @@ body {
   max-width: 100%;
   width: 100%;
   margin: 0;
-  padding: 2rem;
+  padding: 0;
   position: relative;
-  min-height: 100vh;
+  height: 100vh;
 }
 
-.background-glow {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(
-      800px 400px at 50% 0%,
-      rgba(96, 165, 250, 0.08),
-      transparent 50%
-    ),
-    radial-gradient(
-      600px 300px at 80% 100%,
-      rgba(59, 130, 246, 0.06),
-      transparent 50%
-    );
-  pointer-events: none;
-  z-index: -1;
+.main-container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
 }
 
 .header {
@@ -149,57 +135,10 @@ body {
   }
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  width: 100%;
-  max-width: 100%;
-}
-
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 1.5rem;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.02);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.panel::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.panel:hover::before {
-  opacity: 0;
-}
-
-.panel:hover {
-  border-color: var(--border);
-}
-
-.panel-header {
-  margin-bottom: 1.5rem;
-}
-
-.panel h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  color: var(--text);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  padding: 1rem;
 }
 
 .panel-subtitle {
@@ -211,20 +150,22 @@ body {
 /* Chat Panel Styles */
 .chat-panel {
   position: relative;
+  width: 66%;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
 }
 
 .chat-box {
-  height: 400px;
+  height: 100%;
   overflow-y: auto;
-  border: 1px solid var(--border);
+  /* border: 1px solid var(--border); */
   border-radius: 16px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(10px);
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -294,10 +235,7 @@ body {
 
 .msg.assistant {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
   color: var(--text);
-  backdrop-filter: blur(10px);
 }
 
 .msg.loading {
@@ -389,10 +327,6 @@ body {
   min-width: 48px;
 }
 
-.send-button:hover:not(:disabled) {
-  /* Hover effects removed */
-}
-
 .send-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -402,19 +336,11 @@ body {
 /* Multimodal Panel Styles */
 .multimodal-panel {
   position: relative;
+  width: 33%;
 }
 
 .upload-section {
-  /* margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(255, 255, 255, 0.01) 100%
-  ); */
-  /* border: 1px solid var(--border); */
-  /* border-radius: 20px;
-    backdrop-filter: blur(20px); */
+  margin: 2rem 0;
 }
 
 .upload-area {
@@ -807,42 +733,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem;
+  padding: 1rem;
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.03) 0%,
     rgba(255, 255, 255, 0.01) 100%
   );
-  border: 1px solid var(--border);
   border-radius: 20px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: blur(20px);
   position: relative;
   overflow: hidden;
-}
-
-.document-item::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(96, 165, 250, 0.05) 0%,
-    rgba(59, 130, 246, 0.02) 100%
-  );
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.document-item:hover {
-  /* Hover effects removed */
-}
-
-.document-item:hover::before {
-  opacity: 0;
 }
 
 .document-info {
@@ -931,37 +831,17 @@ body {
 }
 
 .delete-button {
-  padding: 0.75rem;
+  position: absolute;
+  right: 2px;
+  top: 2px;
   border: none;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
-  color: white;
+  background: none;
+  color: var(--danger);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  opacity: 0.8;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
-}
-
-.delete-button::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  transition: left 0.5s ease;
 }
 
 .delete-button:hover {

@@ -216,9 +216,13 @@ export function KnowledgeHub() {
   return (
     <section className="panel multimodal-panel">
       <div className="panel-header">
-        <h2>🚀 Knowledge Hub</h2>
+        <div className="brand">
+          <div className="brand-text">
+            <span className="brand-title">RAG Demo</span>
+          </div>
+        </div>
         <div className="panel-subtitle">
-          Upload & analyze any type of content
+          Supported formats: text, images, videos, audio
         </div>
       </div>
       <div className="upload-section">
@@ -313,7 +317,7 @@ export function KnowledgeHub() {
               </div>
             </div>
             <button
-              className="delete-button danger"
+              className="delete-button"
               onClick={() => onDelete(d.id)}
               title="Delete document"
             >

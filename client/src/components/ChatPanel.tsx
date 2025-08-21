@@ -36,20 +36,8 @@ export function ChatPanel() {
   };
 
   return (
-    <section className="panel chat-panel">
-      <div className="panel-header">
-        <h2>💬 Chat</h2>
-        <div className="panel-subtitle">Ask questions about your documents</div>
-      </div>
+    <section className="chat-panel">
       <div className="chat-box">
-        {messages.length === 0 && (
-          <div className="chat-placeholder">
-            <div className="placeholder-icon">💭</div>
-            <div className="placeholder-text">
-              Start a conversation about your documents
-            </div>
-          </div>
-        )}
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role}`}>
             {m.content}

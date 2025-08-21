@@ -6,12 +6,26 @@ export function KnowledgeHub() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     stage: string;
     progress: number;
     message: string;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -27,6 +41,10 @@ export function KnowledgeHub() {
   useEffect(() => {
     load();
   }, []);
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   const onUpload = async (file: File) => {
     const form = new FormData();
@@ -213,12 +231,41 @@ export function KnowledgeHub() {
     }
   };
 
+  // Mobile collapsed view - just show toggle button
+  if (isMobile && !isExpanded) {
+    return (
+      <div className="knowledge-hub-mobile-collapsed">
+        <button
+          onClick={toggleExpanded}
+          className="knowledge-hub-toggle-button"
+          aria-label="Open knowledge hub"
+        >
+          <span className="knowledge-hub-icon">📚</span>
+          <span className="knowledge-hub-label">My Files</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <section className="panel multimodal-panel">
+    <section
+      className={`panel multimodal-panel ${
+        isMobile ? "knowledge-hub-mobile" : ""
+      }`}
+    >
       <div className="panel-header">
         <div className="brand">
           <div className="brand-text">
             <span className="brand-title">RAG Demo</span>
+            {isMobile && (
+              <button
+                onClick={toggleExpanded}
+                className="knowledge-hub-close-button"
+                aria-label="Close knowledge hub"
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
         <div className="panel-subtitle">

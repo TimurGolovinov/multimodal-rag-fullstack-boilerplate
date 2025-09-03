@@ -40,11 +40,15 @@ export class DocumentController {
 
   async listDocuments(req: Request, res: Response): Promise<void> {
     try {
-      const documents = await this.documentService.listDocuments();
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const result = await this.documentService.listDocuments(page, limit);
 
       const response: ListDocumentsResponse = {
-        documents,
-        total: documents.length,
+        documents: result.documents,
+        total: result.total,
+        hasMore: result.hasMore,
       };
 
       res.json(response);

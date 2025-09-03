@@ -35,8 +35,6 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# ChromaDB data
-chroma_db/
 
 # IDE
 .vscode/
@@ -54,4 +52,5 @@ Thumbs.db
 data/
 
 
-deploy
+*.pem
+*.crt

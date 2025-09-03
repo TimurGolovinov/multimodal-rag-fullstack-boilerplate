@@ -125,6 +125,19 @@ if (cluster.isMaster) {
     })
   );
 
+  // Initialize database connection
+  const { dbConnection } = require("./database/config");
+
+  // Connect to database
+  dbConnection
+    .connect()
+    .then(() => {
+      console.log("✅ Database connected successfully");
+    })
+    .catch((error: any) => {
+      console.error("❌ Database connection failed:", error);
+    });
+
   // Initialize services with all processors
   const documentService = DocumentServiceFactory.createWithAllProcessors();
   const chatService = new ChatService(documentService);

@@ -1,9 +1,7 @@
-import { Document } from "../types";
-import { v4 as uuidv4 } from "uuid";
-import { DocumentPersistence } from "./documentPersistence";
-import { OpenAIVectorStore } from "./openaiVectorStore";
+import { Document, DocumentType, ProcessingStatus } from "../types";
+import { DocumentDatabaseService } from "../database/services/documentService";
+import { StorageFactory, StorageService } from "./storageFactory";
 
-// Define interfaces for document processors
 export interface DocumentProcessor {
   canProcess(mimetype: string, filename: string): boolean;
   extractText(
@@ -21,20 +19,17 @@ export interface DocumentServiceConfig {
 }
 
 export class DocumentService {
-  private vectorStore: OpenAIVectorStore;
-  private documents: Map<string, Document> = new Map();
-  private persistence: DocumentPersistence;
-
-  // Document processors injected via constructor
+  private dbService?: DocumentDatabaseService;
+  private storageService: StorageService;
   private processors: DocumentProcessor[] = [];
 
   constructor(config?: DocumentServiceConfig) {
     console.log(
-      "Initializing DocumentService with OpenAI vector store and configurable processors..."
+      "Initializing new DocumentService with database and storage..."
     );
 
-    this.vectorStore = new OpenAIVectorStore();
-    this.persistence = new DocumentPersistence();
+    // Initialize storage service
+    this.storageService = StorageFactory.createStorageService();
 
     // Add configured processors
     if (config?.imageProcessor) this.processors.push(config.imageProcessor);
@@ -43,233 +38,224 @@ export class DocumentService {
     if (config?.pdfProcessor) this.processors.push(config.pdfProcessor);
     if (config?.wordProcessor) this.processors.push(config.wordProcessor);
 
-    this.initializeVectorStore();
-    this.loadPersistedDocuments();
+    console.log("✅ New DocumentService initialized successfully");
   }
 
-  private loadPersistedDocuments(): void {
-    this.documents = this.persistence.loadDocuments();
-  }
-
-  private async initializeVectorStore() {
-    try {
-      await this.vectorStore.initialize();
-      // Vector store logs its own initialization status
-    } catch (error) {
-      console.error("Failed to initialize OpenAI Vector Store:", error);
-      console.log("Server will continue without vector search capabilities");
+  /**
+   * Initialize database service when needed
+   */
+  private async ensureDatabaseService() {
+    if (!this.dbService) {
+      this.dbService = new DocumentDatabaseService();
+      // Ensure database is connected
+      await this.dbService.getDocumentStats(); // This will trigger connection
     }
   }
 
+  /**
+   * Upload a new document
+   */
   async uploadDocument(file: Express.Multer.File): Promise<Document> {
-    const content = await this.extractText(file);
-    const documentType = this.getDocumentType(file.mimetype, file.originalname);
-    console.log("Document type", documentType);
+    try {
+      console.log(`📤 Uploading document: ${file.originalname}`);
 
-    // Extract thumbnail if available
-    let thumbnail: string | null = null;
+      // Extract text content
+      const content = await this.extractText(file);
+      const documentType = this.getDocumentType(
+        file.mimetype,
+        file.originalname
+      );
+
+      // Store file in storage
+      const storedFile = await this.storageService.storeFile(file, "documents");
+
+      // Extract thumbnail if available
+      let thumbnailPath: string | undefined;
+      const processor = this.findProcessor(file.mimetype, file.originalname);
+      if (processor) {
+        try {
+          const result = await processor.extractText(
+            file.buffer,
+            file.originalname
+          );
+          if (result.thumbnail) {
+            // Store thumbnail
+            const thumbnailFile = {
+              ...file,
+              buffer: Buffer.from(result.thumbnail, "utf-8"),
+              mimetype: "text/plain",
+              originalname: `${file.originalname}.thumbnail`,
+            };
+            const storedThumbnail = await this.storageService.storeFile(
+              thumbnailFile,
+              "thumbnails"
+            );
+            thumbnailPath = storedThumbnail.filePath;
+          }
+        } catch (error) {
+          console.warn(
+            `Failed to extract thumbnail from ${documentType}:`,
+            error
+          );
+        }
+      }
+
+      // Create document in database
+      await this.ensureDatabaseService();
+      const document = await this.dbService!.createDocument({
+        filename: file.originalname,
+        originalFilename: file.originalname,
+        content,
+        filePath: storedFile.filePath,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        documentType,
+        thumbnailPath,
+        metadata: {
+          size: file.size,
+          mimetype: file.mimetype,
+          originalType: documentType,
+          uploadedVia: "new-service",
+        },
+      });
+
+      console.log(`✅ Document uploaded successfully: ${document.filename}`);
+      return document;
+    } catch (error) {
+      console.error(`❌ Failed to upload document:`, error);
+      throw new Error(
+        `Failed to upload document: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }
+
+  /**
+   * Get a document by ID
+   */
+  async getDocument(id: string): Promise<Document | null> {
+    try {
+      await this.ensureDatabaseService();
+      return await this.dbService!.getDocument(id);
+    } catch (error) {
+      console.error(`❌ Failed to get document ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * List documents with pagination
+   */
+  async listDocuments(
+    page: number = 1,
+    limit: number = 20,
+    documentType?: DocumentType,
+    processingStatus?: ProcessingStatus
+  ): Promise<{ documents: Document[]; total: number; hasMore: boolean }> {
+    try {
+      await this.ensureDatabaseService();
+      const offset = (page - 1) * limit;
+      return await this.dbService!.listDocuments({
+        limit,
+        offset,
+        documentType,
+        processingStatus,
+      });
+    } catch (error) {
+      console.error(`❌ Failed to list documents:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a document
+   */
+  async deleteDocument(id: string): Promise<boolean> {
+    try {
+      await this.ensureDatabaseService();
+      // Get document info first
+      const document = await this.dbService!.getDocument(id);
+      if (!document) {
+        return false;
+      }
+
+      // Delete from database (this will also handle file cleanup)
+      const deleted = await this.dbService!.deleteDocument(id);
+
+      if (deleted) {
+        console.log(`✅ Document deleted successfully: ${document.filename}`);
+      }
+
+      return deleted;
+    } catch (error) {
+      console.error(`❌ Failed to delete document ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search documents by content
+   */
+  async searchDocuments(
+    query: string,
+    limit: number = 20
+  ): Promise<Document[]> {
+    try {
+      await this.ensureDatabaseService();
+      return await this.dbService!.searchDocuments(query, limit);
+    } catch (error) {
+      console.error(`❌ Failed to search documents:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get document statistics
+   */
+  async getDocumentStats() {
+    try {
+      await this.ensureDatabaseService();
+      return await this.dbService!.getDocumentStats();
+    } catch (error) {
+      console.error(`❌ Failed to get document stats:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Extract text content from file
+   */
+  private async extractText(file: Express.Multer.File): Promise<string> {
     const processor = this.findProcessor(file.mimetype, file.originalname);
+
     if (processor) {
       try {
         const result = await processor.extractText(
           file.buffer,
           file.originalname
         );
-        thumbnail = result.thumbnail || null;
+        return result.content;
       } catch (error) {
         console.warn(
-          `Failed to extract thumbnail from ${documentType}:`,
+          `Processor failed for ${file.originalname}, falling back to basic extraction:`,
           error
         );
       }
     }
 
-    const document: Document = {
-      id: uuidv4(),
-      filename: file.originalname,
-      content,
-      uploadedAt: new Date(),
-      type: documentType,
-      metadata: {
-        size: file.size,
-        mimetype: file.mimetype,
-        originalType: documentType,
-      },
-      thumbnail,
-    };
-
-    // Add document to OpenAI vector store first (automatic chunking)
-    try {
-      // Use regular upload for normal-sized documents
-      await this.vectorStore.addDocument(document.id, document.content, {
-        filename: document.filename,
-        uploadedAt: document.uploadedAt.toISOString(),
-        type: documentType,
-        document_id: document.id,
-        size: file.size,
-        mimetype: file.mimetype,
-      });
-
-      console.log(
-        `Document "${document.filename}" (${documentType}) added to OpenAI vector store with automatic chunking`
-      );
-
-      // Only persist to disk and memory if vector store upload was successful
-      this.documents.set(document.id, document);
-      this.persistence.saveDocuments(this.documents);
-      console.log(
-        `Document "${document.filename}" successfully persisted to disk`
-      );
-    } catch (error) {
-      console.error(
-        "Failed to index document with OpenAI vector store:",
-        error
-      );
-      console.log(
-        `Document "${document.filename}" NOT persisted - vector store indexing failed`
-      );
-      // Don't persist the document if vector store fails
-      throw error; // Re-throw to let the caller know the upload failed
+    // Fallback: return basic text for text files
+    if (file.mimetype.startsWith("text/")) {
+      return file.buffer.toString("utf-8");
     }
 
-    return document;
+    // For other file types, return a placeholder
+    return `[${file.mimetype} file: ${file.originalname}]`;
   }
 
-  async listDocuments(): Promise<Document[]> {
-    return Array.from(this.documents.values());
-  }
-
-  async searchDocuments(query: string, limit: number = 5): Promise<Document[]> {
-    try {
-      if (!this.vectorStore.isReady()) {
-        console.log("Vector search disabled - returning all documents");
-        return Array.from(this.documents.values()).slice(0, limit);
-      }
-
-      // Use advanced search with query rewriting enabled
-      const searchResults = await this.vectorStore.searchAdvanced(query, {
-        limit,
-        rewriteQuery: true,
-      });
-
-      console.log(
-        `Vector search found ${searchResults.length} relevant chunks`
-      );
-      if (searchResults.length === 0) {
-        return [];
-      }
-
-      // Map search results back to documents using documentId from metadata
-      const documentIds = new Set<string>();
-      searchResults.forEach((result) => {
-        if (result.metadata.document_id) {
-          documentIds.add(result.metadata.document_id);
-        }
-      });
-
-      const foundDocuments = Array.from(documentIds)
-        .map((id) => this.documents.get(id))
-        .filter((doc): doc is Document => doc !== undefined)
-        .slice(0, limit);
-
-      console.log(`Found ${foundDocuments.length} relevant documents`);
-      return foundDocuments;
-    } catch (error) {
-      console.error(
-        "Vector search failed, falling back to all documents:",
-        error
-      );
-      return Array.from(this.documents.values()).slice(0, limit);
-    }
-  }
-
-  async getDocument(id: string): Promise<Document | undefined> {
-    return this.documents.get(id);
-  }
-
-  async deleteDocument(id: string): Promise<boolean> {
-    const existing = this.documents.get(id);
-    if (!existing) {
-      return false;
-    }
-
-    // Remove from in-memory and persist
-    this.documents.delete(id);
-    this.persistence.saveDocuments(this.documents);
-
-    // Try to remove from vector store and Files API
-    try {
-      if (this.vectorStore.isReady()) {
-        console.log(
-          `Deleting document ${id} from OpenAI vector store and Files API...`
-        );
-        await this.vectorStore.deleteDocument(id);
-        console.log(`Successfully deleted document ${id} from OpenAI services`);
-      }
-    } catch (error) {
-      console.error("Failed to delete document from OpenAI services:", error);
-    }
-
-    return true;
-  }
-
-  // OpenAI vector store handles chunking automatically - no need for manual chunk management
-
-  private getDocumentType(
-    mimetype: string,
-    filename: string
-  ): "text" | "image" | "audio" | "video" | "pdf" | "word" {
-    if (mimetype.startsWith("image/")) {
-      return "image";
-    }
-    if (mimetype.startsWith("audio/")) {
-      return "audio";
-    }
-    if (mimetype.startsWith("video/")) {
-      return "video";
-    }
-    if (mimetype === "application/pdf") {
-      return "pdf";
-    }
-    if (mimetype.includes("word") || mimetype.includes("docx")) {
-      return "word";
-    }
-    if (mimetype === "text/plain") {
-      return "text";
-    }
-
-    // Fallback based on file extension
-    const ext = filename.split(".").pop()?.toLowerCase();
-    if (["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext || "")) {
-      return "image";
-    }
-    if (
-      ["mp3", "wav", "m4a", "ogg", "flac", "aac", "wma", "opus"].includes(
-        ext || ""
-      )
-    ) {
-      return "audio";
-    }
-    if (
-      [
-        "mp4",
-        "mov",
-        "avi",
-        "webm",
-        "mkv",
-        "flv",
-        "wmv",
-        "m4v",
-        "3gp",
-        "ogv",
-      ].includes(ext || "")
-    ) {
-      return "video";
-    }
-
-    return "text"; // default fallback
-  }
-
+  /**
+   * Find appropriate processor for file type
+   */
   private findProcessor(
     mimetype: string,
     filename: string
@@ -279,68 +265,64 @@ export class DocumentService {
     );
   }
 
-  private async extractText(file: Express.Multer.File): Promise<string> {
-    const buffer = file.buffer;
-    console.log("Extracting text for file", file);
-
-    // Find appropriate processor
-    const processor = this.findProcessor(file.mimetype, file.originalname);
-    if (processor) {
-      try {
-        const result = await processor.extractText(buffer, file.originalname);
-        console.log(`Processing completed for "${file.originalname}"`);
-        return result.content;
-      } catch (error) {
-        console.error(`Failed to process "${file.originalname}":`, error);
-        throw new Error(
-          `Processing failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
-        );
-      }
-    }
-
-    // Handle text-based formats directly
-    if (file.mimetype === "text/plain") {
-      return buffer.toString("utf-8");
-    }
-
-    // Handle media files (images, videos, audio) with appropriate processors
+  /**
+   * Determine document type from MIME type and filename
+   */
+  private getDocumentType(mimetype: string, filename: string): DocumentType {
+    if (mimetype.startsWith("text/")) return "text";
+    if (mimetype.startsWith("image/")) return "image";
+    if (mimetype.startsWith("audio/")) return "audio";
+    if (mimetype.startsWith("video/")) return "video";
+    if (mimetype === "application/pdf") return "pdf";
     if (
-      file.mimetype.startsWith("image/") ||
-      file.mimetype.startsWith("video/") ||
-      file.mimetype.startsWith("audio/")
-    ) {
-      try {
-        const mediaProcessor = this.processors.find((p) =>
-          p.canProcess(file.mimetype, file.originalname)
-        );
-        if (mediaProcessor) {
-          const result = await mediaProcessor.extractText(
-            buffer,
-            file.originalname
-          );
-          console.log(
-            `${file.mimetype.split("/")[0]} analysis completed for "${
-              file.originalname
-            }"`
-          );
-          return result.content;
-        }
-      } catch (error) {
-        console.error(
-          `Failed to analyze ${file.mimetype.split("/")[0]} "${
-            file.originalname
-          }":`,
-          error
-        );
-        // Fallback to basic description
-        return `${file.mimetype.split("/")[0]} file: ${
-          file.originalname
-        } - Content analysis failed`;
-      }
-    }
+      mimetype.includes("word") ||
+      filename.endsWith(".doc") ||
+      filename.endsWith(".docx")
+    )
+      return "word";
 
-    throw new Error(`Unsupported file type: ${file.mimetype}`);
+    return "text"; // Default fallback
+  }
+
+  /**
+   * Get storage information
+   */
+  getStorageInfo() {
+    if ("getStorageInfo" in this.storageService) {
+      return (this.storageService as any).getStorageInfo();
+    }
+    return {
+      type: "unknown",
+      description: "Storage service info not available",
+    };
+  }
+
+  /**
+   * Test storage and database connections
+   */
+  async testConnections() {
+    try {
+      const storageTest = await StorageFactory.testStorageConfiguration();
+      await this.ensureDatabaseService();
+      const dbTest = await this.dbService!.getDocumentStats(); // This will test DB connection
+
+      return {
+        storage: storageTest.success,
+        database: true,
+        details: {
+          storage: storageTest,
+          database: "Connected successfully",
+        },
+      };
+    } catch (error) {
+      return {
+        storage: false,
+        database: false,
+        details: {
+          storage: "Test failed",
+          database: error instanceof Error ? error.message : "Unknown error",
+        },
+      };
+    }
   }
 }

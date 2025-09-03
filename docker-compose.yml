@@ -1,0 +1,204 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rag-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-rag_app}
+      POSTGRES_USER: ${DB_USER:-rag_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rag_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/src/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-rag_user} -d ${DB_NAME:-rag_app}",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: rag-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-rag_redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: rag-client
+    environment:
+      VITE_API_BASE: https://chat.aisolved.com.au
+    networks:
+      - rag-network
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # RAG Application
+  app:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: production
+    container_name: rag-app
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rag_app}
+      DB_USER: ${DB_USER:-rag_user}
+      DB_PASSWORD: ${DB_PASSWORD:-rag_password}
+      DB_SSL: false
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-rag_redis_password}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-localhost,127.0.0.1}
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,audio/mpeg,audio/wav,video/mp4}
+    volumes:
+      - app_uploads:/app/uploads
+      - app_logs:/app/logs
+    ports:
+      - "3000:3000"
+    networks:
+      - rag-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: rag-nginx
+    volumes:
+      - ./nginx/nginx.server.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - app_uploads:/var/www/rag-app:ro
+      - nginx_logs:/var/log/nginx
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - rag-network
+    depends_on:
+      app:
+        condition: service_healthy
+      client:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Certbot for Let's Encrypt
+  certbot:
+    image: certbot/certbot
+    container_name: rag-certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    command: certonly --webroot --webroot-path=/var/www/certbot --email your-email@example.com --agree-tos --no-eff-email -d chat.aisolved.com.au
+    profiles:
+      - certbot
+
+  # Backup Service (optional)
+  backup:
+    image: postgres:15-alpine
+    container_name: rag-backup
+    environment:
+      POSTGRES_DB: ${DB_NAME:-rag_app}
+      POSTGRES_USER: ${DB_USER:-rag_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rag_password}
+    volumes:
+      - ./backups:/backups
+      - postgres_data:/var/lib/postgresql/data:ro
+    networks:
+      - rag-network
+    command: |
+      sh -c '
+        while true; do
+          echo "Creating backup at $$(date)"
+          pg_dump -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB > /backups/backup_$$(date +%Y%m%d_%H%M%S).sql
+          echo "Backup completed"
+          sleep 86400
+        done
+      '
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - backup
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_uploads:
+    driver: local
+  app_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  certbot_www:
+    driver: local
+  certbot_conf:
+    driver: local
+
+networks:
+  rag-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

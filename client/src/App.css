@@ -694,6 +694,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  overflow-y: auto;
 }
 
 .loading-state {
@@ -1035,7 +1036,7 @@ body {
   }
 
   .panel {
-    padding: 1.25rem;
+    padding: 0.5rem;
   }
 
   /* Hide desktop knowledge hub panel on mobile */

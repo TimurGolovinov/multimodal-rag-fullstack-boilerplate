@@ -1,7 +1,4 @@
-import {
-  DocumentService,
-  DocumentServiceConfig,
-} from "./documentService";
+import { DocumentService, DocumentServiceConfig } from "./documentService";
 import {
   ImageProcessorAdapter,
   AudioProcessorAdapter,

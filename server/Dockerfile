@@ -74,6 +74,10 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from build stage
 COPY --from=build --chown=nodejs:nodejs /app/dist ./dist
 
+# Copy database migration files
+COPY --from=build --chown=nodejs:nodejs /app/src/database/migrations ./src/database/migrations
+COPY --from=build --chown=nodejs:nodejs /app/src/database/seeds ./src/database/seeds
+
 # Create necessary directories
 RUN mkdir -p uploads logs && \
     chown -R nodejs:nodejs uploads logs

@@ -13,6 +13,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Set build-time environment variables
+ARG VITE_API_BASE=http://localhost
+ENV VITE_API_BASE=$VITE_API_BASE
+
 # Build the application
 RUN npm run build
 

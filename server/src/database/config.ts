@@ -187,30 +187,6 @@ export class DatabaseConnection {
       waitingCount: this.pool.waitingCount,
     };
   }
-
-  public async runMigrations(): Promise<void> {
-    try {
-      const client = await this.pool.connect();
-
-      // Read and execute schema.sql
-      const fs = require("fs");
-      const path = require("path");
-      const schemaPath = path.join(__dirname, "schema.sql");
-
-      if (fs.existsSync(schemaPath)) {
-        const schema = fs.readFileSync(schemaPath, "utf8");
-        await client.query(schema);
-        console.log("✅ Database migrations completed successfully");
-      } else {
-        console.warn("⚠️  Schema file not found, skipping migrations");
-      }
-
-      client.release();
-    } catch (error) {
-      console.error("❌ Database migrations failed:", error);
-      throw error;
-    }
-  }
 }
 
 // Export singleton instance

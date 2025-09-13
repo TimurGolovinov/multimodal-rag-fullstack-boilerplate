@@ -3,12 +3,21 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cluster from "cluster";
 import os from "os";
+import cookieParser from "cookie-parser";
 import { DocumentServiceFactory } from "./services/documentServiceFactory";
 import { ChatService } from "./services/chatService";
 import { DocumentController } from "./controllers/documentController";
 import { ChatController } from "./controllers/chatController";
 import { createDocumentRoutes } from "./routes/documentRoutes";
 import { createChatRoutes } from "./routes/chatRoutes";
+import { createAuthRoutes } from "./routes/authRoutes";
+import { createUserRoutes } from "./routes/userRoutes";
+import {
+  enforceHTTPS,
+  httpsHeaders,
+  trustProxy,
+} from "./middleware/httpsMiddleware";
+import { AuthMiddleware } from "./middleware/authMiddleware";
 
 // Load environment variables
 dotenv.config();
@@ -115,36 +124,98 @@ async function runMigrations() {
 }
 
 function setupMiddleware(app: express.Application) {
+  // HTTPS enforcement (production only)
+  app.use(trustProxy);
+  app.use(enforceHTTPS);
+  app.use(httpsHeaders);
+
   // Performance optimizations
   app.use(require("compression")());
   app.use(
     require("helmet")({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+        },
+      },
       crossOriginEmbedderPolicy: false,
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      noSniff: true,
+      xssFilter: true,
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     })
   );
 
-  // CORS configuration
+  // CORS configuration - More restrictive for security
   const corsOptions = {
     origin: function (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void
     ) {
-      if (!origin) return callback(null, true);
+      // In production, reject requests without origin
+      if (process.env.NODE_ENV === "production" && !origin) {
+        return callback(
+          new Error("CORS: Origin header required in production"),
+          false
+        );
+      }
+
+      // Allow requests without origin in development (for tools like Postman)
+      if (!origin && process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
 
       const allowedDomains = process.env.ALLOWED_DOMAINS?.split(",") || [];
-      const isAllowed = allowedDomains.some(
-        (domain) => origin.includes(domain) || origin === domain
-      );
+
+      // If no domains configured, reject all
+      if (allowedDomains.length === 0) {
+        return callback(
+          new Error("CORS: No allowed domains configured"),
+          false
+        );
+      }
+
+      const isAllowed = allowedDomains.some((domain) => {
+        const trimmedDomain = domain.trim();
+        return (
+          origin === trimmedDomain ||
+          origin === `https://${trimmedDomain}` ||
+          origin === `http://${trimmedDomain}` ||
+          (trimmedDomain.includes("*") &&
+            origin &&
+            new RegExp(trimmedDomain.replace(/\*/g, ".*")).test(origin))
+        );
+      });
 
       if (isAllowed) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        console.warn(`CORS: Blocked request from origin: ${origin}`);
+        callback(new Error(`CORS: Origin ${origin} not allowed`), false);
       }
     },
     credentials: true,
-    optionsSuccessStatus: 200,
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-csrf-token",
+      "x-access-token",
+    ],
+    exposedHeaders: ["x-csrf-token"],
   };
 
   app.use(cors(corsOptions));
@@ -153,8 +224,8 @@ function setupMiddleware(app: express.Application) {
   const rateLimit = require("express-rate-limit");
 
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200,
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"), // 15 minutes default
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "200"),
     message: {
       success: false,
       message: "Too many requests from this IP, please try again later.",
@@ -163,20 +234,36 @@ function setupMiddleware(app: express.Application) {
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: true,
+    // Use IP address only - user ID can be spoofed
     keyGenerator: (req: any) => {
-      return req.headers["x-user-id"] || req.ip;
+      // Get real IP address (considering proxies)
+      const forwarded = req.headers["x-forwarded-for"];
+      const realIp = req.headers["x-real-ip"];
+      const ip = forwarded ? forwarded.split(",")[0] : realIp || req.ip;
+      return ip;
+    },
+    // Skip rate limiting for health checks
+    skip: (req: any) => {
+      return req.path === "/health" || req.path === "/api/health";
     },
   });
 
   const processingLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: parseInt(process.env.RATE_LIMIT_PROCESSING_MAX || "10"),
     message: {
       success: false,
       message: "Too many processing requests, please try again later.",
       error: "PROCESSING_RATE_LIMIT_EXCEEDED",
     },
     skipSuccessfulRequests: false,
+    // Use IP address for processing rate limiting too
+    keyGenerator: (req: any) => {
+      const forwarded = req.headers["x-forwarded-for"];
+      const realIp = req.headers["x-real-ip"];
+      const ip = forwarded ? forwarded.split(",")[0] : realIp || req.ip;
+      return ip;
+    },
   });
 
   app.use(limiter);
@@ -184,6 +271,9 @@ function setupMiddleware(app: express.Application) {
   // Body parsing
   app.use(express.json({ limit: "25mb", strict: false }));
   app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+
+  // Cookie parsing
+  app.use(cookieParser());
 
   // Store limiters for use in routes
   (app as any).processingLimiter = processingLimiter;
@@ -209,6 +299,9 @@ function setupRoutes(
   documentController: DocumentController,
   chatController: ChatController
 ) {
+  // Initialize auth middleware with database pool
+  const { dbConnection } = require("./database/config");
+  AuthMiddleware.initialize(dbConnection.getPool());
   // Health check
   app.get("/health", (req, res) => {
     const memUsage = process.memoryUsage();
@@ -234,6 +327,10 @@ function setupRoutes(
 
   // API routes
   const processingLimiter = (app as any).processingLimiter;
+
+  // Authentication routes
+  app.use("/api/auth", createAuthRoutes(dbConnection.getPool()));
+  app.use("/api/users", createUserRoutes(dbConnection.getPool()));
 
   app.use(
     "/api/documents/upload",

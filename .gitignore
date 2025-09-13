@@ -51,6 +51,17 @@ Thumbs.db
 *.temp
 data/
 
+# Cookie files
+cookies.txt
+cookies_after_logout.txt
+csrf_cookies.txt
+test_cookies*.txt
+
+# Test scripts
+test-auth-flow.sh
+
+# Vite cache
+.vite/
 
 *.pem
 *.crt

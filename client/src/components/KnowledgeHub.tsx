@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Doc } from "../types";
 import { API_BASE } from "../constants";
 
@@ -27,7 +27,7 @@ export function KnowledgeHub() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/documents`);
@@ -36,94 +36,97 @@ export function KnowledgeHub() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
-  const toggleExpanded = () => {
+  const toggleExpanded = useCallback(() => {
     setIsExpanded(!isExpanded);
-  };
+  }, [isExpanded]);
 
-  const onUpload = async (file: File) => {
-    const form = new FormData();
-    form.append("document", file);
-    setUploading(true);
-    setUploadProgress({
-      stage: "uploading",
-      progress: 0,
-      message: "Starting upload...",
-    });
+  const onUpload = useCallback(
+    async (file: File) => {
+      const form = new FormData();
+      form.append("document", file);
+      setUploading(true);
+      setUploadProgress({
+        stage: "uploading",
+        progress: 0,
+        message: "Starting upload...",
+      });
 
-    try {
-      // Simulate progress for video files
-      if (file.type.startsWith("video/")) {
-        setUploadProgress({
-          stage: "extracting",
-          progress: 10,
-          message: "Processing video...",
-        });
-
-        // Simulate frame extraction progress
-        for (let i = 1; i <= 5; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
+      try {
+        // Simulate progress for video files
+        if (file.type.startsWith("video/")) {
           setUploadProgress({
             stage: "extracting",
-            progress: 10 + i * 8,
-            message: `Extracting frames... ${i}/5`,
+            progress: 10,
+            message: "Processing video...",
           });
-        }
 
-        setUploadProgress({
-          stage: "analyzing",
-          progress: 50,
-          message: "Analyzing with AI...",
-        });
+          // Simulate frame extraction progress
+          for (let i = 1; i <= 5; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            setUploadProgress({
+              stage: "extracting",
+              progress: 10 + i * 8,
+              message: `Extracting frames... ${i}/5`,
+            });
+          }
 
-        // Simulate AI analysis
-        for (let i = 1; i <= 3; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 800));
           setUploadProgress({
             stage: "analyzing",
-            progress: 50 + i * 15,
-            message: `AI analysis... ${i}/3`,
+            progress: 50,
+            message: "Analyzing with AI...",
+          });
+
+          // Simulate AI analysis
+          for (let i = 1; i <= 3; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            setUploadProgress({
+              stage: "analyzing",
+              progress: 50 + i * 15,
+              message: `AI analysis... ${i}/3`,
+            });
+          }
+
+          setUploadProgress({
+            stage: "synthesizing",
+            progress: 95,
+            message: "Finalizing...",
           });
         }
 
-        setUploadProgress({
-          stage: "synthesizing",
-          progress: 95,
-          message: "Finalizing...",
+        await fetch(`${API_BASE}/api/documents/upload`, {
+          method: "POST",
+          body: form,
         });
+
+        setUploadProgress({
+          stage: "complete",
+          progress: 100,
+          message: "Upload complete!",
+        });
+
+        await load();
+      } catch (error) {
+        setUploadProgress({
+          stage: "error",
+          progress: 0,
+          message: `Upload failed: ${error}`,
+        });
+      } finally {
+        setUploading(false);
+        setTimeout(() => setUploadProgress(null), 2000);
+        if (fileRef.current) fileRef.current.value = "";
       }
+    },
+    [load]
+  );
 
-      await fetch(`${API_BASE}/api/documents/upload`, {
-        method: "POST",
-        body: form,
-      });
-
-      setUploadProgress({
-        stage: "complete",
-        progress: 100,
-        message: "Upload complete!",
-      });
-
-      await load();
-    } catch (error) {
-      setUploadProgress({
-        stage: "error",
-        progress: 0,
-        message: `Upload failed: ${error}`,
-      });
-    } finally {
-      setUploading(false);
-      setTimeout(() => setUploadProgress(null), 2000);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
-
-  const onDelete = async (id: string) => {
+  const onDelete = useCallback(async (id: string) => {
     setLoading(true);
     try {
       await fetch(`${API_BASE}/api/documents/${id}`, { method: "DELETE" });
@@ -131,9 +134,9 @@ export function KnowledgeHub() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getFileIcon = (filename: string, type: string) => {
+  const getFileIcon = useCallback((filename: string, type: string) => {
     if (type === "image") {
       const ext = filename.split(".").pop()?.toLowerCase();
       switch (ext) {
@@ -210,9 +213,9 @@ export function KnowledgeHub() {
       default:
         return "📁";
     }
-  };
+  }, []);
 
-  const getTypeLabel = (type: string) => {
+  const getTypeLabel = useCallback((type: string) => {
     switch (type) {
       case "image":
         return "Image";
@@ -229,7 +232,7 @@ export function KnowledgeHub() {
       default:
         return "Document";
     }
-  };
+  }, []);
 
   // Mobile collapsed view - just show toggle button
   if (isMobile && !isExpanded) {

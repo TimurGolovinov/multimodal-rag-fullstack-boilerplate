@@ -9,6 +9,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "stream";
 import * as fs from "fs";
 import * as path from "path";
+import { FileValidationService } from "./fileValidationService";
 
 export interface S3StorageConfig {
   region: string;
@@ -339,21 +340,27 @@ export class S3StorageService {
   }
 
   /**
-   * Validate file before storage
+   * Validate file before storage using magic number checking
    */
   private validateFile(file: Express.Multer.File): void {
     if (!file) {
       throw new Error("No file provided");
     }
 
+    // Use the new file validation service
+    const validation = FileValidationService.validateFile(
+      file,
+      this.config.allowedMimeTypes
+    );
+    if (!validation.isValid) {
+      throw new Error(validation.error || "File validation failed");
+    }
+
+    // Additional size check (redundant but kept for clarity)
     if (file.size > this.config.maxFileSize) {
       throw new Error(
         `File size ${file.size} exceeds maximum allowed size ${this.config.maxFileSize}`
       );
-    }
-
-    if (!this.config.allowedMimeTypes.includes(file.mimetype)) {
-      throw new Error(`MIME type ${file.mimetype} is not allowed`);
     }
   }
 

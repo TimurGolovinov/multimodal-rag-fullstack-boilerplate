@@ -61,7 +61,7 @@ export class StorageFactory {
       maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "10485760"),
       allowedMimeTypes: (
         process.env.ALLOWED_FILE_TYPES ||
-        "pdf,doc,docx,txt,jpg,jpeg,png,gif,mp3,wav,mp4,avi"
+        "text/plain,text/csv,text/html,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg"
       ).split(","),
       thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || "80"),
       cleanupInterval: parseInt(process.env.CLEANUP_INTERVAL || "86400000"),
@@ -84,7 +84,7 @@ export class StorageFactory {
       maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "10485760"),
       allowedMimeTypes: (
         process.env.ALLOWED_FILE_TYPES ||
-        "pdf,doc,docx,txt,jpg,jpeg,png,gif,mp3,wav,mp4,avi"
+        "text/plain,text/csv,text/html,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg"
       ).split(","),
       thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || "80"),
       cleanupInterval: parseInt(process.env.CLEANUP_INTERVAL || "86400000"),
@@ -116,10 +116,24 @@ export class StorageFactory {
       local: {
         basePath: process.env.UPLOAD_DIR || "./uploads",
         maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "10485760"),
-        allowedMimeTypes: (
-          process.env.ALLOWED_FILE_TYPES ||
-          "pdf,doc,docx,txt,jpg,jpeg,png,gif,mp3,wav,mp4,avi"
-        ).split(","),
+        allowedMimeTypes: [
+          "text/plain",
+          "text/csv",
+          "text/html",
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "audio/mpeg",
+          "audio/wav",
+          "audio/ogg",
+          "video/mp4",
+          "video/webm",
+          "video/ogg",
+        ],
         thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || "80"),
         cleanupInterval: parseInt(process.env.CLEANUP_INTERVAL || "86400000"),
       },
@@ -131,10 +145,24 @@ export class StorageFactory {
         endpoint: process.env.S3_ENDPOINT || undefined,
         forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
         maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "10485760"),
-        allowedMimeTypes: (
-          process.env.ALLOWED_FILE_TYPES ||
-          "pdf,doc,docx,txt,jpg,jpeg,png,gif,mp3,wav,mp4,avi"
-        ).split(","),
+        allowedMimeTypes: [
+          "text/plain",
+          "text/csv",
+          "text/html",
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "audio/mpeg",
+          "audio/wav",
+          "audio/ogg",
+          "video/mp4",
+          "video/webm",
+          "video/ogg",
+        ],
         thumbnailQuality: parseInt(process.env.THUMBNAIL_QUALITY || "80"),
         cleanupInterval: parseInt(process.env.CLEANUP_INTERVAL || "86400000"),
       },

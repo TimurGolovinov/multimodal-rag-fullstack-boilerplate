@@ -1,7 +1,7 @@
 :root {
   --bg: #0a0a0f;
   --panel: rgba(255, 255, 255, 0.03);
-  --panel-2: rgba(255, 255, 255, 0.05);
+  --panel-2: rgba(0, 0, 0, 0.75);
   --border: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.12);
   --muted: rgba(255, 255, 255, 0.5);
@@ -13,6 +13,45 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   color-scheme: dark;
+}
+
+/* App loading styles */
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.app-loading .loading-spinner {
+  margin-bottom: 1rem;
+}
+
+.app-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.app-loading p {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin: 0;
 }
 
 /* Base Styles - Enhanced for better viewport handling */
@@ -62,11 +101,140 @@ body {
 }
 
 /* Layout - Enhanced for better overflow handling */
+/* Global User Profile Styles */
+.global-user-profile-button {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.global-user-profile-button:hover {
+  background: var(--border);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* User Profile Styles in KnowledgeHub */
+.user-section {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.user-profile-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-profile-button:hover {
+  background: var(--border);
+  border-color: var(--border-hover);
+}
+
+.user-avatar-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.user-avatar-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-avatar-small span {
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.user-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-profile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000; /* Higher z-index to ensure visibility on mobile */
+  padding: 2rem;
+}
+
+.user-profile-container {
+  position: relative;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.close-profile-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 2rem;
+  cursor: pointer;
+  z-index: 1001;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50px;
+}
+
+.close-profile-button:hover {
+  color: var(--text);
+}
+
 .main-container {
   display: flex;
   height: 100%;
   min-height: 0; /* Allow flex children to shrink */
-  overflow: hidden;
+  /* Removed overflow: hidden to allow content to be visible */
 }
 
 .chat-panel {
@@ -75,7 +243,7 @@ body {
   flex-direction: column;
   padding: 2rem;
   min-height: 0; /* Allow flex children to shrink */
-  overflow: hidden;
+  /* Removed overflow: hidden to allow content to be visible */
 }
 
 .multimodal-panel {
@@ -85,7 +253,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0; /* Allow flex children to shrink */
-  overflow: hidden;
+  /* Removed overflow: hidden to allow content to be visible */
 }
 
 /* Header */
@@ -552,6 +720,7 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
   padding-right: 4px; /* Space for scrollbar */
+  padding-bottom: 56px;
 }
 
 .documents-list::-webkit-scrollbar {
@@ -687,39 +856,26 @@ body {
 /* Document Items - Enhanced visual hierarchy */
 .document-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 1rem;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 100%
-  );
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 20px;
   transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
-  /* Subtle shadow for depth */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.document-item:hover {
-  border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
 }
 
 .document-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   flex: 1;
+  padding-top: 0.25rem; /* Add slight padding to align with content */
 }
 
 .document-thumbnail {
-  width: 56px;
-  height: 56px;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid var(--border);
@@ -727,40 +883,47 @@ body {
 }
 
 .thumbnail-image {
-  width: 100%;
-  height: 100%;
+  width: 36px;
+  height: 36px;
   object-fit: cover;
 }
 
 .document-content-3rows {
-  padding: 0 0.25rem;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
+  padding: 0;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   line-height: 1.4;
-  overflow: hidden;
+  /* Keep ellipsis truncation but allow more space */
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   max-width: 100%;
-  max-height: calc(1.4em * 3);
+  max-height: calc(1.4em * 4);
+  overflow: hidden; /* Re-add overflow hidden for ellipsis to work */
 }
 
 .document-icon {
-  font-size: 1.5rem;
-  opacity: 0.8;
+  font-size: 1.25rem;
+  width: 36px;
+  height: 36px;
 }
 
 .document-details {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0; /* Allow text to wrap properly */
 }
 
 .document-name {
   font-weight: 600;
   color: var(--text);
   font-size: 0.95rem;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .document-meta {
@@ -820,7 +983,7 @@ body {
   width: 100%;
   height: 100vh;
   z-index: 1000;
-  /* background: var(--bg); */
+  background: black;
   padding: 1rem;
   animation: slideInUp 0.3s ease-out;
   overflow-y: auto;
@@ -965,6 +1128,18 @@ body {
     flex-direction: column;
     gap: 0.75rem;
   }
+
+  /* Mobile user profile modal adjustments */
+  .user-profile-overlay {
+    padding: 1rem;
+    z-index: 10000;
+  }
+
+  .user-profile-container {
+    max-width: 100%;
+    max-height: 95vh;
+    margin: 0;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1023,6 +1198,28 @@ body {
     padding: 0.75rem 1rem; /* Better touch target */
     font-size: 0.9rem;
     min-height: 48px;
+  }
+
+  /* Mobile user profile button in collapsed view */
+  .knowledge-hub-mobile-collapsed .user-profile-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    min-height: 48px;
+    font-size: 0.9rem;
+  }
+
+  /* Global user profile button on mobile */
+  .global-user-profile-button {
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    min-height: 44px;
+  }
+
+  .global-user-profile-button .user-name {
+    display: none; /* Hide name on mobile to save space */
   }
 
   .knowledge-hub-icon {

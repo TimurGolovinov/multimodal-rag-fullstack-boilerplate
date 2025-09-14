@@ -122,15 +122,24 @@ export class OpenAIVectorStore {
       }
 
       // Create a proper File object using Node.js File constructor
+      // Use the correct MIME type for better processing
+      const mimeType = metadata.mimetype || "text/plain";
       const fileBuffer = Buffer.from(content, "utf-8");
       const fileObject = new File([fileBuffer], filename, {
-        type: "text/plain",
+        type: mimeType,
       });
 
       file = await this.openai.files.create({
         file: fileObject,
         purpose: "assistants",
       });
+
+      console.log(
+        `📁 File created with ID: ${file.id}, status: ${file.status}`
+      );
+
+      // Wait for file processing to complete
+      await this.waitForFileProcessing(file.id);
 
       // Add file to vector store with metadata and chunking strategy
       await this.openai.vectorStores.files.create(this.vectorStoreId!, {
@@ -142,6 +151,7 @@ export class OpenAIVectorStore {
           uploaded_at: metadata.uploadedAt,
           size: metadata.size,
           mimetype: metadata.mimetype,
+          user_id: metadata.userId,
         },
         // Optional: customize chunking strategy (using OpenAI defaults)
         chunking_strategy: {
@@ -208,6 +218,77 @@ export class OpenAIVectorStore {
       }));
     } catch (error) {
       console.error("Failed to search OpenAI vector store:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Wait for file processing to complete
+   */
+  private async waitForFileProcessing(
+    fileId: string,
+    maxRetries: number = 30
+  ): Promise<void> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const file = await this.openai.files.retrieve(fileId);
+        console.log(`📁 File ${fileId} status: ${file.status}`);
+
+        if (file.status === "processed") {
+          console.log(`✅ File ${fileId} processing completed successfully`);
+          return;
+        } else if (file.status === "error") {
+          throw new Error(`File ${fileId} processing failed: Unknown error`);
+        } else {
+          throw new Error(`File ${fileId} processing was cancelled`);
+        }
+
+        // Wait 2 seconds before checking again
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`Error checking file status: ${error}`);
+        throw error;
+      }
+    }
+
+    throw new Error(
+      `File ${fileId} processing timed out after ${maxRetries} retries`
+    );
+  }
+
+  /**
+   * Clean up failed files from vector store
+   */
+  async cleanupFailedFiles(): Promise<void> {
+    if (!this.isInitialized || !this.vectorStoreId) {
+      throw new Error("Vector store not initialized");
+    }
+
+    try {
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+      const failedFiles = files.data.filter((file) => file.status === "failed");
+
+      console.log(`🧹 Found ${failedFiles.length} failed files to clean up`);
+
+      for (const file of failedFiles) {
+        try {
+          // First, delete from vector store
+          await this.openai.vectorStores.files.delete(file.id, {
+            vector_store_id: this.vectorStoreId,
+          });
+
+          // Then, delete the underlying file from OpenAI Files API
+          await this.openai.files.delete(file.id);
+
+          console.log(`🗑️ Removed failed file: ${file.id}`);
+        } catch (error) {
+          console.error(`Failed to remove file ${file.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to cleanup failed files:", error);
       throw error;
     }
   }

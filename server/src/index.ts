@@ -5,6 +5,7 @@ import cluster from "cluster";
 import os from "os";
 import cookieParser from "cookie-parser";
 import { DocumentServiceFactory } from "./services/documentServiceFactory";
+import { DocumentService } from "./services/documentService";
 import { ChatService } from "./services/chatService";
 import { DocumentController } from "./controllers/documentController";
 import { ChatController } from "./controllers/chatController";
@@ -94,7 +95,9 @@ async function createServer() {
 
   // Start server
   app.listen(PORT, () => {
-    console.log(`🚀 Server ${process.pid} started on port ${PORT}`);
+    console.log(
+      `🚀 HOT RELOAD TEST: Server ${process.pid} started on port ${PORT}`
+    );
     console.log(
       `📚 Document endpoints: http://localhost:${PORT}/api/documents`
     );
@@ -279,17 +282,27 @@ function setupMiddleware(app: express.Application) {
   (app as any).processingLimiter = processingLimiter;
 }
 
+// Global service instances
+let globalDocumentService: DocumentService | null = null;
+let globalChatService: ChatService | null = null;
+
 async function initializeServices() {
   const { dbConnection } = require("./database/config");
 
   await dbConnection.connect();
   console.log("✅ Database connected successfully");
 
-  const documentService = DocumentServiceFactory.createWithAllProcessors();
-  const chatService = new ChatService(documentService);
+  // Create singleton instances
+  if (!globalDocumentService) {
+    globalDocumentService = DocumentServiceFactory.createWithAllProcessors();
+  }
 
-  const documentController = new DocumentController(documentService);
-  const chatController = new ChatController(chatService);
+  if (!globalChatService) {
+    globalChatService = new ChatService(globalDocumentService);
+  }
+
+  const documentController = new DocumentController(globalDocumentService);
+  const chatController = new ChatController(globalChatService);
 
   return { documentController, chatController };
 }
@@ -307,15 +320,22 @@ function setupRoutes(
     const memUsage = process.memoryUsage();
     const uptime = process.uptime();
 
-    // Get vector store status
+    // Get vector store status using global service instance
     let vectorStoreStatus = {
       available: false,
       message: "Not checked",
       documentCount: 0,
     };
     try {
-      const documentService = DocumentServiceFactory.createWithAllProcessors();
-      vectorStoreStatus = await documentService.getVectorStoreStats();
+      if (globalDocumentService) {
+        vectorStoreStatus = await globalDocumentService.getVectorStoreStats();
+      } else {
+        vectorStoreStatus = {
+          available: false,
+          message: "Document service not initialized",
+          documentCount: 0,
+        };
+      }
     } catch (error) {
       vectorStoreStatus = {
         available: false,

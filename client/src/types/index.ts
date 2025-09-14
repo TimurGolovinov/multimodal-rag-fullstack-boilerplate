@@ -12,4 +12,5 @@ export type ChatResponse = {
   success: boolean;
   message: string;
   sources: Doc[];
+  messageId?: string;
 };

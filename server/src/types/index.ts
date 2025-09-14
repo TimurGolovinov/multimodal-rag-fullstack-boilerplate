@@ -79,6 +79,7 @@ export interface ChatResponse {
   message: string;
   sources: Document[];
   sessionId?: string;
+  messageId?: string;
 }
 
 export interface UploadResponse {

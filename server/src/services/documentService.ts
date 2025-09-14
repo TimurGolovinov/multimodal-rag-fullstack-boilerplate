@@ -50,7 +50,7 @@ export class DocumentService {
     if (!this.dbService) {
       this.dbService = new DocumentDatabaseService();
       // Ensure database is connected
-      await this.dbService.getDocumentStats(); // This will trigger connection
+      await this.dbService.testConnection();
     }
   }
 
@@ -284,13 +284,25 @@ export class DocumentService {
       try {
         await this.ensureVectorStore();
         if (this.vectorStore) {
-          console.log(`🔍 Performing vector search for: "${query}"`);
+          console.log(
+            `🔍 HOT RELOAD TEST: Performing vector search for: "${query}"`
+          );
           const vectorResults = await this.vectorStore.search(query, limit);
-
+          console.log("🔍 Vector results count:", vectorResults.length);
+          console.log("🔍 Vector results", vectorResults);
           if (vectorResults.length > 0) {
             // Convert vector store results to Document format and filter by userId
             const documents: Document[] = [];
             for (const result of vectorResults) {
+              // First check if the document belongs to the user
+              const resultUserId = result.metadata.user_id;
+              if (resultUserId !== userId) {
+                console.log(
+                  `🔍 Skipping document ${result.metadata.document_id} - belongs to user ${resultUserId}, searching for user ${userId}`
+                );
+                continue;
+              }
+
               // Get the full document from database to ensure we have all fields
               const docId = result.metadata.document_id;
               if (docId) {
@@ -320,9 +332,13 @@ export class DocumentService {
           }
         }
       } catch (vectorError) {
-        console.warn(
-          "⚠️ Vector search failed, falling back to text search:",
+        console.error(
+          "❌ Vector search failed, falling back to text search:",
           vectorError
+        );
+        console.error(
+          "Vector error details:",
+          JSON.stringify(vectorError, null, 2)
         );
       }
 
@@ -338,10 +354,10 @@ export class DocumentService {
   /**
    * Get document statistics
    */
-  async getDocumentStats() {
+  async getDocumentStats(userId: string) {
     try {
       await this.ensureDatabaseService();
-      return await this.dbService!.getDocumentStats();
+      return await this.dbService!.getDocumentStats(userId);
     } catch (error) {
       console.error(`❌ Failed to get document stats:`, error);
       throw error;
@@ -351,6 +367,24 @@ export class DocumentService {
   /**
    * Get vector store status and statistics
    */
+  /**
+   * Clean up failed files from vector store
+   */
+  async cleanupFailedFiles() {
+    try {
+      await this.ensureVectorStore();
+      if (!this.vectorStore) {
+        throw new Error("Vector store not available");
+      }
+
+      await this.vectorStore.cleanupFailedFiles();
+      console.log("✅ Failed files cleaned up successfully");
+    } catch (error) {
+      console.error(`❌ Failed to cleanup failed files:`, error);
+      throw error;
+    }
+  }
+
   async getVectorStoreStats() {
     try {
       await this.ensureVectorStore();
@@ -461,7 +495,7 @@ export class DocumentService {
     try {
       const storageTest = await StorageFactory.testStorageConfiguration();
       await this.ensureDatabaseService();
-      const dbTest = await this.dbService!.getDocumentStats(); // This will test DB connection
+      const dbTest = await this.dbService!.testConnection(); // Test database connection
 
       return {
         storage: storageTest.success,

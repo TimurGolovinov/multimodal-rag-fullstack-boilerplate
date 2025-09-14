@@ -45,6 +45,18 @@ export class DocumentDatabaseService {
   }
 
   /**
+   * Test database connection
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.getPool().query("SELECT 1");
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Create a new document in the database
    */
   async createDocument(data: DocumentCreateData): Promise<Document> {
@@ -377,9 +389,9 @@ export class DocumentDatabaseService {
   }
 
   /**
-   * Get document statistics
+   * Get document statistics for a specific user
    */
-  async getDocumentStats(): Promise<{
+  async getDocumentStats(userId: string): Promise<{
     totalDocuments: number;
     totalSize: number;
     byType: Record<string, { count: number; totalSize: number }>;
@@ -388,28 +400,30 @@ export class DocumentDatabaseService {
     const client = await this.getPool().connect();
 
     try {
-      // Get overall stats
+      // Get overall stats for user
       const overallQuery = `
         SELECT 
           COUNT(*) as total_documents,
           SUM(file_size) as total_size
         FROM documents
+        WHERE user_id = $1
       `;
 
-      const overallResult = await client.query(overallQuery);
+      const overallResult = await client.query(overallQuery, [userId]);
       const { total_documents, total_size } = overallResult.rows[0];
 
-      // Get stats by type
+      // Get stats by type for user
       const byTypeQuery = `
         SELECT 
           document_type,
           COUNT(*) as count,
           SUM(file_size) as total_size
         FROM documents 
+        WHERE user_id = $1
         GROUP BY document_type
       `;
 
-      const byTypeResult = await client.query(byTypeQuery);
+      const byTypeResult = await client.query(byTypeQuery, [userId]);
       const byType: Record<string, { count: number; totalSize: number }> = {};
 
       byTypeResult.rows.forEach((row) => {
@@ -419,16 +433,17 @@ export class DocumentDatabaseService {
         };
       });
 
-      // Get stats by status
+      // Get stats by status for user
       const byStatusQuery = `
         SELECT 
           processing_status,
           COUNT(*) as count
         FROM documents 
+        WHERE user_id = $1
         GROUP BY processing_status
       `;
 
-      const byStatusResult = await client.query(byStatusQuery);
+      const byStatusResult = await client.query(byStatusQuery, [userId]);
       const byStatus: Record<string, number> = {};
 
       byStatusResult.rows.forEach((row) => {
@@ -506,5 +521,211 @@ export class DocumentDatabaseService {
       processingStatus: row.processing_status,
       errorMessage: row.error_message,
     };
+  }
+
+  /**
+   * Save a chat message to the database
+   */
+  async saveChatMessage(
+    userId: string,
+    sessionId: string,
+    role: "user" | "assistant",
+    content: string,
+    documentIds: string[] = [],
+    metadata: Record<string, any> = {}
+  ): Promise<string> {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        INSERT INTO chat_messages (user_id, session_id, role, content, document_ids, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `;
+      const values = [
+        userId,
+        sessionId,
+        role,
+        content,
+        documentIds,
+        JSON.stringify(metadata),
+      ];
+
+      const result = await client.query(query, values);
+      return result.rows[0].id;
+    } catch (error) {
+      throw new Error(
+        `Failed to save chat message: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get chat history for a user and session
+   */
+  async getChatHistory(
+    userId: string,
+    sessionId: string,
+    limit: number = 50
+  ): Promise<
+    Array<{
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      documentIds: string[];
+      timestamp: Date;
+      metadata: Record<string, any>;
+    }>
+  > {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        SELECT id, role, content, document_ids, timestamp, metadata
+        FROM chat_messages
+        WHERE user_id = $1 AND session_id = $2
+        ORDER BY timestamp ASC
+        LIMIT $3
+      `;
+      const values = [userId, sessionId, limit.toString()];
+
+      const result = await client.query(query, values);
+
+      return result.rows.map((row) => ({
+        id: row.id,
+        role: row.role,
+        content: row.content,
+        documentIds: row.document_ids || [],
+        timestamp: row.timestamp,
+        metadata: row.metadata || {},
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to get chat history: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get recent chat messages for context window
+   */
+  async getRecentChatMessages(
+    userId: string,
+    sessionId: string,
+    limit: number = 10
+  ): Promise<
+    Array<{
+      role: "user" | "assistant";
+      content: string;
+    }>
+  > {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        SELECT role, content
+        FROM chat_messages
+        WHERE user_id = $1 AND session_id = $2
+        ORDER BY timestamp DESC
+        LIMIT $3
+      `;
+      const values = [userId, sessionId, limit.toString()];
+
+      const result = await client.query(query, values);
+
+      // Reverse to get chronological order (oldest first)
+      return result.rows.reverse().map((row) => ({
+        role: row.role,
+        content: row.content,
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to get recent chat messages: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Clear chat history for a user and session
+   */
+  async clearChatHistory(userId: string, sessionId: string): Promise<boolean> {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        DELETE FROM chat_messages
+        WHERE user_id = $1 AND session_id = $2
+      `;
+      const values = [userId, sessionId];
+
+      const result = await client.query(query, values);
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      throw new Error(
+        `Failed to clear chat history: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get all chat sessions for a user
+   */
+  async getChatSessions(userId: string): Promise<
+    Array<{
+      sessionId: string;
+      lastMessage: string;
+      lastMessageTime: Date;
+      messageCount: number;
+    }>
+  > {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        SELECT 
+          session_id,
+          content as last_message,
+          timestamp as last_message_time,
+          COUNT(*) as message_count
+        FROM chat_messages
+        WHERE user_id = $1
+        GROUP BY session_id, content, timestamp
+        ORDER BY timestamp DESC
+      `;
+      const values = [userId];
+
+      const result = await client.query(query, values);
+
+      return result.rows.map((row) => ({
+        sessionId: row.session_id,
+        lastMessage: row.last_message,
+        lastMessageTime: row.timestamp,
+        messageCount: parseInt(row.message_count),
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to get chat sessions: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
   }
 }

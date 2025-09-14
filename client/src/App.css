@@ -246,6 +246,88 @@ body {
   /* Removed overflow: hidden to allow content to be visible */
 }
 
+.chat-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.session-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+  background: var(--panel);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.clear-button {
+  padding: 0.5rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clear-button:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.clear-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input-buttons .clear-button {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+}
+
+.input-buttons .clear-button:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
+.input-buttons .clear-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .multimodal-panel {
   width: 33%;
   position: relative;
@@ -398,6 +480,29 @@ body {
   white-space: pre-wrap;
   word-wrap: break-word;
   animation: messageSlideIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.msg-content {
+  flex: 1;
+}
+
+.msg-timestamp {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  align-self: flex-end;
+  margin-top: 0.25rem;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 @keyframes messageSlideIn {
@@ -1180,6 +1285,16 @@ body {
   .chat-input {
     padding: 0.875rem; /* Better touch target */
     font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .input-buttons {
+    gap: 0.5rem;
+  }
+
+  .input-buttons .clear-button {
+    min-width: 48px;
+    height: 48px;
+    padding: 0.75rem;
   }
 
   .send-button {

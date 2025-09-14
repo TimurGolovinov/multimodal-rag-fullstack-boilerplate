@@ -303,15 +303,34 @@ function setupRoutes(
   const { dbConnection } = require("./database/config");
   AuthMiddleware.initialize(dbConnection.getPool());
   // Health check
-  app.get("/health", (req, res) => {
+  app.get("/health", async (req, res) => {
     const memUsage = process.memoryUsage();
     const uptime = process.uptime();
+
+    // Get vector store status
+    let vectorStoreStatus = {
+      available: false,
+      message: "Not checked",
+      documentCount: 0,
+    };
+    try {
+      const documentService = DocumentServiceFactory.createWithAllProcessors();
+      vectorStoreStatus = await documentService.getVectorStoreStats();
+    } catch (error) {
+      vectorStoreStatus = {
+        available: false,
+        message: `Error checking vector store: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        documentCount: 0,
+      };
+    }
 
     res.json({
       status: "OK",
       timestamp: new Date().toISOString(),
       service: "RAG Demo Server",
-      version: "1.0.0",
+      version: "2.0.0",
       worker: process.pid,
       uptime: `${Math.floor(uptime / 3600)}h ${Math.floor(
         (uptime % 3600) / 60
@@ -322,6 +341,7 @@ function setupRoutes(
         external: `${Math.round(memUsage.external / 1024 / 1024)}MB`,
       },
       cpu: process.cpuUsage(),
+      vectorStore: vectorStoreStatus,
     });
   });
 

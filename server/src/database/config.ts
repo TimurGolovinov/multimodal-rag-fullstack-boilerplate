@@ -148,7 +148,7 @@ export class DatabaseConnection {
         SELECT table_name 
         FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name IN ('documents', 'chat_messages', 'document_embeddings', 'file_storage')
+        AND table_name IN ('documents', 'chat_messages', 'file_storage', 'users')
         ORDER BY table_name
       `);
 
@@ -157,8 +157,8 @@ export class DatabaseConnection {
       const expectedTables = [
         "documents",
         "chat_messages",
-        "document_embeddings",
         "file_storage",
+        "users",
       ];
       const foundTables = result.rows.map((row) => row.table_name);
 

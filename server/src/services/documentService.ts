@@ -1,6 +1,7 @@
 import { Document, DocumentType, ProcessingStatus } from "../types";
 import { DocumentDatabaseService } from "../database/services/documentService";
 import { StorageFactory, StorageService } from "./storageFactory";
+import { OpenAIVectorStore } from "./openaiVectorStore";
 
 export interface DocumentProcessor {
   canProcess(mimetype: string, filename: string): boolean;
@@ -21,6 +22,7 @@ export interface DocumentServiceConfig {
 export class DocumentService {
   private dbService?: DocumentDatabaseService;
   private storageService: StorageService;
+  private vectorStore?: OpenAIVectorStore;
   private processors: DocumentProcessor[] = [];
 
   constructor(config?: DocumentServiceConfig) {
@@ -49,6 +51,25 @@ export class DocumentService {
       this.dbService = new DocumentDatabaseService();
       // Ensure database is connected
       await this.dbService.getDocumentStats(); // This will trigger connection
+    }
+  }
+
+  /**
+   * Initialize vector store when needed
+   */
+  private async ensureVectorStore() {
+    if (!this.vectorStore) {
+      try {
+        this.vectorStore = new OpenAIVectorStore();
+        await this.vectorStore.initialize();
+        console.log("✅ OpenAI Vector Store initialized successfully");
+      } catch (error) {
+        console.warn("⚠️ Failed to initialize OpenAI Vector Store:", error);
+        console.warn(
+          "⚠️ Vector search will be disabled, falling back to text search"
+        );
+        this.vectorStore = undefined;
+      }
     }
   }
 
@@ -123,6 +144,37 @@ export class DocumentService {
         },
       });
 
+      // Add document to vector store for semantic search
+      try {
+        await this.ensureVectorStore();
+        if (this.vectorStore && content.trim().length > 0) {
+          await this.vectorStore.addDocument(document.id, content, {
+            filename: document.filename,
+            type: documentType,
+            uploadedAt: document.uploadedAt.toISOString(),
+            size: document.fileSize || file.size,
+            mimetype: document.mimeType || file.mimetype,
+            userId: userId,
+          });
+          console.log(
+            `✅ Document added to vector store: ${document.filename}`
+          );
+        } else if (!this.vectorStore) {
+          console.warn(
+            "⚠️ Vector store not available, skipping vector indexing"
+          );
+        } else {
+          console.warn(
+            "⚠️ Document content is empty, skipping vector indexing"
+          );
+        }
+      } catch (vectorError) {
+        console.warn("⚠️ Failed to add document to vector store:", vectorError);
+        console.warn(
+          "⚠️ Document uploaded successfully but vector search will not work for this document"
+        );
+      }
+
       console.log(`✅ Document uploaded successfully: ${document.filename}`);
       return document;
     } catch (error) {
@@ -190,6 +242,23 @@ export class DocumentService {
       const deleted = await this.dbService!.deleteDocument(id, userId);
 
       if (deleted) {
+        // Also delete from vector store
+        try {
+          await this.ensureVectorStore();
+          if (this.vectorStore) {
+            await this.vectorStore.deleteDocument(id);
+            console.log(
+              `✅ Document deleted from vector store: ${document.filename}`
+            );
+          }
+        } catch (vectorError) {
+          console.warn(
+            "⚠️ Failed to delete document from vector store:",
+            vectorError
+          );
+          // Don't fail the entire operation if vector store deletion fails
+        }
+
         console.log(`✅ Document deleted successfully: ${document.filename}`);
       }
 
@@ -210,6 +279,55 @@ export class DocumentService {
   ): Promise<Document[]> {
     try {
       await this.ensureDatabaseService();
+
+      // Try vector search first
+      try {
+        await this.ensureVectorStore();
+        if (this.vectorStore) {
+          console.log(`🔍 Performing vector search for: "${query}"`);
+          const vectorResults = await this.vectorStore.search(query, limit);
+
+          if (vectorResults.length > 0) {
+            // Convert vector store results to Document format and filter by userId
+            const documents: Document[] = [];
+            for (const result of vectorResults) {
+              // Get the full document from database to ensure we have all fields
+              const docId = result.metadata.document_id;
+              if (docId) {
+                try {
+                  const fullDoc = await this.dbService!.getDocument(
+                    docId,
+                    userId
+                  );
+                  if (fullDoc) {
+                    documents.push(fullDoc);
+                  }
+                } catch (dbError) {
+                  console.warn(
+                    `⚠️ Could not fetch document ${docId} from database:`,
+                    dbError
+                  );
+                }
+              }
+            }
+
+            if (documents.length > 0) {
+              console.log(
+                `✅ Vector search found ${documents.length} documents`
+              );
+              return documents;
+            }
+          }
+        }
+      } catch (vectorError) {
+        console.warn(
+          "⚠️ Vector search failed, falling back to text search:",
+          vectorError
+        );
+      }
+
+      // Fallback to text search
+      console.warn("⚠️ Falling back to text-based search");
       return await this.dbService!.searchDocuments(query, limit, userId);
     } catch (error) {
       console.error(`❌ Failed to search documents:`, error);
@@ -227,6 +345,38 @@ export class DocumentService {
     } catch (error) {
       console.error(`❌ Failed to get document stats:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Get vector store status and statistics
+   */
+  async getVectorStoreStats() {
+    try {
+      await this.ensureVectorStore();
+      if (!this.vectorStore) {
+        return {
+          available: false,
+          message: "Vector store not available",
+          documentCount: 0,
+        };
+      }
+
+      const documentCount = await this.vectorStore.getDocumentCount();
+      return {
+        available: true,
+        message: "Vector store is ready",
+        documentCount,
+      };
+    } catch (error) {
+      console.error(`❌ Failed to get vector store stats:`, error);
+      return {
+        available: false,
+        message: `Vector store error: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+        documentCount: 0,
+      };
     }
   }
 

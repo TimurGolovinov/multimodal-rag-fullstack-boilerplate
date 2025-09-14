@@ -46,7 +46,6 @@ CREATE TABLE user_sessions (
 ALTER TABLE documents ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE chat_messages ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
 ALTER TABLE file_storage ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
-ALTER TABLE document_embeddings ADD COLUMN user_id UUID REFERENCES users(id) ON DELETE CASCADE;
 
 -- Create indexes for performance
 CREATE INDEX idx_users_email ON users(email);
@@ -65,7 +64,6 @@ CREATE INDEX idx_user_sessions_created_at ON user_sessions(created_at DESC);
 CREATE INDEX idx_documents_user_id ON documents(user_id);
 CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id);
 CREATE INDEX idx_file_storage_user_id ON file_storage(user_id);
-CREATE INDEX idx_document_embeddings_user_id ON document_embeddings(user_id);
 
 -- Create composite indexes for common queries
 CREATE INDEX idx_documents_user_uploaded_at ON documents(user_id, uploaded_at DESC);

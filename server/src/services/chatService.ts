@@ -13,12 +13,13 @@ export class ChatService {
     this.documentService = documentService;
   }
 
-  async chat(request: ChatRequest): Promise<ChatResponse> {
+  async chat(request: ChatRequest, userId: string): Promise<ChatResponse> {
     try {
       // Search for relevant documents
       const relevantDocs = await this.documentService.searchDocuments(
         request.message,
-        3
+        3,
+        userId
       );
       console.log("Relevant docs", relevantDocs);
 

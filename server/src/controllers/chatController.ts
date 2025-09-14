@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ChatService } from "../services/chatService";
 import { ChatRequest } from "../types";
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
 import {
   ErrorHandlingService,
   ErrorType,
@@ -14,8 +15,16 @@ export class ChatController {
     this.chatService = chatService;
   }
 
-  async chat(req: Request, res: Response): Promise<void> {
+  async chat(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+        return;
+      }
+
       const { message, documentIds }: ChatRequest = req.body;
 
       if (!message || typeof message !== "string") {
@@ -31,7 +40,10 @@ export class ChatController {
         return;
       }
 
-      const response = await this.chatService.chat({ message, documentIds });
+      const response = await this.chatService.chat(
+        { message, documentIds },
+        req.user.id
+      );
 
       res.json({
         success: true,

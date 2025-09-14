@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { DocumentService } from "../services/documentService";
 import { UploadResponse, ListDocumentsResponse } from "../types";
+import { AuthenticatedRequest } from "../middleware/authMiddleware";
 
 export class DocumentController {
   private documentService: DocumentService;
@@ -9,7 +10,10 @@ export class DocumentController {
     this.documentService = documentService;
   }
 
-  async uploadDocument(req: Request, res: Response): Promise<void> {
+  async uploadDocument(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
     try {
       if (!req.file) {
         res.status(400).json({
@@ -19,7 +23,18 @@ export class DocumentController {
         return;
       }
 
-      const document = await this.documentService.uploadDocument(req.file);
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+        return;
+      }
+
+      const document = await this.documentService.uploadDocument(
+        req.file,
+        req.user.id
+      );
 
       const response: UploadResponse = {
         success: true,
@@ -38,12 +53,24 @@ export class DocumentController {
     }
   }
 
-  async listDocuments(req: Request, res: Response): Promise<void> {
+  async listDocuments(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+        return;
+      }
+
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
 
-      const result = await this.documentService.listDocuments(page, limit);
+      const result = await this.documentService.listDocuments(
+        page,
+        limit,
+        req.user.id
+      );
 
       const response: ListDocumentsResponse = {
         documents: result.documents,
@@ -62,10 +89,18 @@ export class DocumentController {
     }
   }
 
-  async getDocument(req: Request, res: Response): Promise<void> {
+  async getDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+        return;
+      }
+
       const { id } = req.params;
-      const document = await this.documentService.getDocument(id);
+      const document = await this.documentService.getDocument(id, req.user.id);
 
       if (!document) {
         res.status(404).json({
@@ -86,10 +121,21 @@ export class DocumentController {
     }
   }
 
-  async deleteDocument(req: Request, res: Response): Promise<void> {
+  async deleteDocument(
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> {
     try {
+      if (!req.user?.id) {
+        res.status(401).json({
+          success: false,
+          message: "User not authenticated",
+        });
+        return;
+      }
+
       const { id } = req.params;
-      const ok = await this.documentService.deleteDocument(id);
+      const ok = await this.documentService.deleteDocument(id, req.user.id);
       if (!ok) {
         res.status(404).json({ success: false, message: "Document not found" });
         return;

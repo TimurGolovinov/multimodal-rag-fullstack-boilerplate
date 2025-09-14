@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Doc } from "../types";
 import { API_BASE } from "../constants";
+import { useAuth } from "../contexts/AuthContext";
 
 export function KnowledgeHub() {
+  const { isAuthenticated } = useAuth();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -14,6 +16,25 @@ export function KnowledgeHub() {
     message: string;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Helper function to create authenticated fetch headers
+  const getAuthHeaders = useCallback(() => {
+    const headers: Record<string, string> = {};
+
+    // Add Authorization header if token exists
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    // Add CSRF token if exists
+    const csrfToken = localStorage.getItem("csrfToken");
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken;
+    }
+
+    return headers;
+  }, []);
 
   // Check if device is mobile
   useEffect(() => {
@@ -28,15 +49,31 @@ export function KnowledgeHub() {
   }, []);
 
   const load = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log("User not authenticated, skipping document load");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/documents`);
+      const res = await fetch(`${API_BASE}/api/documents`, {
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
       setDocs(data.documents || []);
+    } catch (error) {
+      console.error("Failed to load documents:", error);
+      setDocs([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, getAuthHeaders]);
 
   useEffect(() => {
     load();
@@ -48,6 +85,11 @@ export function KnowledgeHub() {
 
   const onUpload = useCallback(
     async (file: File) => {
+      if (!isAuthenticated) {
+        console.error("User not authenticated, cannot upload documents");
+        return;
+      }
+
       const form = new FormData();
       form.append("document", file);
       setUploading(true);
@@ -101,6 +143,8 @@ export function KnowledgeHub() {
 
         await fetch(`${API_BASE}/api/documents/upload`, {
           method: "POST",
+          headers: getAuthHeaders(),
+          credentials: "include",
           body: form,
         });
 
@@ -123,18 +167,32 @@ export function KnowledgeHub() {
         if (fileRef.current) fileRef.current.value = "";
       }
     },
-    [load]
+    [load, isAuthenticated, getAuthHeaders]
   );
 
-  const onDelete = useCallback(async (id: string) => {
-    setLoading(true);
-    try {
-      await fetch(`${API_BASE}/api/documents/${id}`, { method: "DELETE" });
-      await load();
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const onDelete = useCallback(
+    async (id: string) => {
+      if (!isAuthenticated) {
+        console.error("User not authenticated, cannot delete documents");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await fetch(`${API_BASE}/api/documents/${id}`, {
+          method: "DELETE",
+          headers: getAuthHeaders(),
+          credentials: "include",
+        });
+        await load();
+      } catch (error) {
+        console.error("Failed to delete document:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isAuthenticated, getAuthHeaders, load]
+  );
 
   const getFileIcon = useCallback((filename: string, type: string) => {
     if (type === "image") {

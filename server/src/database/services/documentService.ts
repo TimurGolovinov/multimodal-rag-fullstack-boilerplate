@@ -12,6 +12,7 @@ export interface DocumentCreateData {
   documentType: DocumentType;
   thumbnailPath?: string;
   metadata?: Record<string, any>;
+  userId: string;
 }
 
 export interface DocumentUpdateData {
@@ -30,6 +31,7 @@ export interface DocumentQueryOptions {
   searchQuery?: string;
   sortBy?: "uploaded_at" | "filename" | "file_size";
   sortOrder?: "ASC" | "DESC";
+  userId: string; // Required for user isolation
 }
 
 export class DocumentDatabaseService {
@@ -54,8 +56,8 @@ export class DocumentDatabaseService {
       const query = `
         INSERT INTO documents (
           filename, original_filename, content, file_path, file_size, 
-          mime_type, document_type, thumbnail_path, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          mime_type, document_type, thumbnail_path, metadata, user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
 
@@ -69,6 +71,7 @@ export class DocumentDatabaseService {
         data.documentType,
         data.thumbnailPath || null,
         data.metadata ? JSON.stringify(data.metadata) : "{}",
+        data.userId,
       ];
 
       const result = await client.query(query, values);
@@ -78,7 +81,8 @@ export class DocumentDatabaseService {
         client,
         data.filePath,
         "document",
-        data.fileSize
+        data.fileSize,
+        data.userId
       );
 
       await client.query("COMMIT");
@@ -99,12 +103,14 @@ export class DocumentDatabaseService {
   /**
    * Get a document by ID
    */
-  async getDocument(id: string): Promise<Document | null> {
+  async getDocument(id: string, userId: string): Promise<Document | null> {
     const client = await this.getPool().connect();
 
     try {
-      const query = "SELECT * FROM documents WHERE id = $1";
-      const result = await client.query(query, [id]);
+      const query = "SELECT * FROM documents WHERE id = $1 AND user_id = $2";
+      const values = [id, userId];
+
+      const result = await client.query(query, values);
 
       if (result.rows.length === 0) {
         return null;
@@ -195,7 +201,7 @@ export class DocumentDatabaseService {
   /**
    * Delete a document
    */
-  async deleteDocument(id: string): Promise<boolean> {
+  async deleteDocument(id: string, userId: string): Promise<boolean> {
     const client = await this.getPool().connect();
 
     try {
@@ -203,8 +209,10 @@ export class DocumentDatabaseService {
 
       // Get document info before deletion
       const docQuery =
-        "SELECT file_path, thumbnail_path FROM documents WHERE id = $1";
-      const docResult = await client.query(docQuery, [id]);
+        "SELECT file_path, thumbnail_path FROM documents WHERE id = $1 AND user_id = $2";
+      const docValues = [id, userId];
+
+      const docResult = await client.query(docQuery, docValues);
 
       if (docResult.rows.length === 0) {
         await client.query("ROLLBACK");
@@ -214,8 +222,11 @@ export class DocumentDatabaseService {
       const document = docResult.rows[0];
 
       // Delete from documents table
-      const deleteQuery = "DELETE FROM documents WHERE id = $1";
-      await client.query(deleteQuery, [id]);
+      const deleteQuery =
+        "DELETE FROM documents WHERE id = $1 AND user_id = $2";
+      const deleteValues = [id, userId];
+
+      await client.query(deleteQuery, deleteValues);
 
       // Remove from file_storage tracking
       if (document.file_path) {
@@ -243,7 +254,7 @@ export class DocumentDatabaseService {
   /**
    * List documents with pagination and filtering
    */
-  async listDocuments(options: DocumentQueryOptions = {}): Promise<{
+  async listDocuments(options: DocumentQueryOptions): Promise<{
     documents: Document[];
     total: number;
     hasMore: boolean;
@@ -259,6 +270,7 @@ export class DocumentDatabaseService {
         searchQuery,
         sortBy = "uploaded_at",
         sortOrder = "DESC",
+        userId,
       } = options;
 
       // Build WHERE clause
@@ -282,6 +294,10 @@ export class DocumentDatabaseService {
         );
         values.push(`%${searchQuery}%`, `%${searchQuery}%`);
       }
+
+      // Always filter by userId for security
+      whereConditions.push(`user_id = $${valueIndex++}`);
+      values.push(userId);
 
       const whereClause =
         whereConditions.length > 0
@@ -326,14 +342,15 @@ export class DocumentDatabaseService {
    */
   async searchDocuments(
     query: string,
-    limit: number = 20
+    limit: number = 20,
+    userId: string
   ): Promise<Document[]> {
     const client = await this.getPool().connect();
 
     try {
       const searchQuery = `
         SELECT * FROM documents 
-        WHERE content ILIKE $1 OR filename ILIKE $1
+        WHERE (content ILIKE $1 OR filename ILIKE $1) AND user_id = $2
         ORDER BY 
           CASE 
             WHEN filename ILIKE $1 THEN 1
@@ -341,10 +358,11 @@ export class DocumentDatabaseService {
             ELSE 3
           END,
           uploaded_at DESC
-        LIMIT $2
+        LIMIT $3
       `;
+      const values = [`%${query}%`, userId, limit.toString()];
 
-      const result = await client.query(searchQuery, [`%${query}%`, limit]);
+      const result = await client.query(searchQuery, values);
 
       return result.rows.map((row) => this.mapRowToDocument(row));
     } catch (error) {
@@ -441,18 +459,20 @@ export class DocumentDatabaseService {
     client: PoolClient,
     filePath: string,
     fileType: "document" | "thumbnail" | "temp",
-    fileSize: number
+    fileSize: number,
+    userId: string
   ): Promise<void> {
     const query = `
-      INSERT INTO file_storage (file_path, file_type, file_size)
-      VALUES ($1, $2, $3)
+      INSERT INTO file_storage (file_path, file_type, file_size, user_id)
+      VALUES ($1, $2, $3, $4)
       ON CONFLICT (file_path) 
       DO UPDATE SET 
         file_size = $3,
+        user_id = $4,
         last_accessed = CURRENT_TIMESTAMP
     `;
 
-    await client.query(query, [filePath, fileType, fileSize]);
+    await client.query(query, [filePath, fileType, fileSize, userId]);
   }
 
   /**

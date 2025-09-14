@@ -1,24 +1,54 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { ChatResponse } from "../types";
 import { API_BASE } from "../constants";
+import { useAuth } from "../contexts/AuthContext";
 
 export function ChatPanel() {
+  const { isAuthenticated } = useAuth();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<
     { role: "user" | "assistant"; content: string }[]
   >([]);
   const [loading, setLoading] = useState(false);
 
+  // Helper function to create authenticated fetch headers
+  const getAuthHeaders = useCallback(() => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Add Authorization header if token exists
+    const accessToken = localStorage.getItem("accessToken");
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    // Add CSRF token if exists
+    const csrfToken = localStorage.getItem("csrfToken");
+    if (csrfToken) {
+      headers["x-csrf-token"] = csrfToken;
+    }
+
+    return headers;
+  }, []);
+
   const send = async () => {
     const text = input.trim();
     if (!text) return;
+
+    if (!isAuthenticated) {
+      console.error("User not authenticated, cannot send chat messages");
+      return;
+    }
+
     setMessages((m) => [...m, { role: "user", content: text }]);
     setInput("");
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
+        credentials: "include",
         body: JSON.stringify({ message: text }),
       });
       const data: ChatResponse = await res.json();

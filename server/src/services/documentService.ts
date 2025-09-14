@@ -55,7 +55,10 @@ export class DocumentService {
   /**
    * Upload a new document
    */
-  async uploadDocument(file: Express.Multer.File): Promise<Document> {
+  async uploadDocument(
+    file: Express.Multer.File,
+    userId: string
+  ): Promise<Document> {
     try {
       console.log(`📤 Uploading document: ${file.originalname}`);
 
@@ -111,6 +114,7 @@ export class DocumentService {
         mimeType: file.mimetype,
         documentType,
         thumbnailPath,
+        userId,
         metadata: {
           size: file.size,
           mimetype: file.mimetype,
@@ -134,10 +138,10 @@ export class DocumentService {
   /**
    * Get a document by ID
    */
-  async getDocument(id: string): Promise<Document | null> {
+  async getDocument(id: string, userId: string): Promise<Document | null> {
     try {
       await this.ensureDatabaseService();
-      return await this.dbService!.getDocument(id);
+      return await this.dbService!.getDocument(id, userId);
     } catch (error) {
       console.error(`❌ Failed to get document ${id}:`, error);
       throw error;
@@ -150,6 +154,7 @@ export class DocumentService {
   async listDocuments(
     page: number = 1,
     limit: number = 20,
+    userId: string,
     documentType?: DocumentType,
     processingStatus?: ProcessingStatus
   ): Promise<{ documents: Document[]; total: number; hasMore: boolean }> {
@@ -161,6 +166,7 @@ export class DocumentService {
         offset,
         documentType,
         processingStatus,
+        userId,
       });
     } catch (error) {
       console.error(`❌ Failed to list documents:`, error);
@@ -171,17 +177,17 @@ export class DocumentService {
   /**
    * Delete a document
    */
-  async deleteDocument(id: string): Promise<boolean> {
+  async deleteDocument(id: string, userId: string): Promise<boolean> {
     try {
       await this.ensureDatabaseService();
       // Get document info first
-      const document = await this.dbService!.getDocument(id);
+      const document = await this.dbService!.getDocument(id, userId);
       if (!document) {
         return false;
       }
 
       // Delete from database (this will also handle file cleanup)
-      const deleted = await this.dbService!.deleteDocument(id);
+      const deleted = await this.dbService!.deleteDocument(id, userId);
 
       if (deleted) {
         console.log(`✅ Document deleted successfully: ${document.filename}`);
@@ -199,11 +205,12 @@ export class DocumentService {
    */
   async searchDocuments(
     query: string,
-    limit: number = 20
+    limit: number = 20,
+    userId: string
   ): Promise<Document[]> {
     try {
       await this.ensureDatabaseService();
-      return await this.dbService!.searchDocuments(query, limit);
+      return await this.dbService!.searchDocuments(query, limit, userId);
     } catch (error) {
       console.error(`❌ Failed to search documents:`, error);
       throw error;

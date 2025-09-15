@@ -5,7 +5,7 @@ import { PasswordService } from "./passwordService";
  * User interface
  */
 export interface User {
-  id: string;
+  userId: string; // Changed from 'id' to 'userId' for consistency with JWT payload
   email: string;
   firstName?: string;
   lastName?: string;
@@ -485,7 +485,7 @@ export class UserService {
    */
   private static mapRowToUser(row: any): User {
     return {
-      id: row.id,
+      userId: row.id, // Map database 'id' to 'userId' in User interface
       email: row.email,
       firstName: row.first_name,
       lastName: row.last_name,

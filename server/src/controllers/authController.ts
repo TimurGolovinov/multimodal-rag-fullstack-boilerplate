@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { validationResult } from "express-validator";
 import { Pool } from "pg";
 import { AuthService } from "../services/authService";
 import { UserService, CreateUserData } from "../services/userService";
@@ -36,18 +35,6 @@ export class AuthController {
    */
   public register = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: "Please check your input data",
-          details: errors.array(),
-        });
-        return;
-      }
-
       const { email, password, firstName, lastName } = req.body;
 
       // Sanitize inputs
@@ -96,7 +83,7 @@ export class AuthController {
       // Generate tokens
       const authResult = await AuthService.generateTokens(
         {
-          id: user.id,
+          userId: user.userId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -127,7 +114,7 @@ export class AuthController {
         message: "User registered successfully",
         data: {
           user: {
-            id: user.id,
+            userId: user.userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -175,18 +162,6 @@ export class AuthController {
    */
   public login = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: "Please check your input data",
-          details: errors.array(),
-        });
-        return;
-      }
-
       const { email, password } = req.body;
 
       // Sanitize inputs
@@ -268,7 +243,7 @@ export class AuthController {
       // Generate tokens
       const authResult = await AuthService.generateTokens(
         {
-          id: user.id,
+          userId: user.userId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -297,7 +272,7 @@ export class AuthController {
       // Log successful login
       SecurityLoggingService.logAuthEvent(
         SecurityEventType.LOGIN_SUCCESS,
-        user.id,
+        user.userId,
         req.ip || "unknown",
         req.get("User-Agent"),
         "User logged in successfully",
@@ -309,7 +284,7 @@ export class AuthController {
         message: "Login successful",
         data: {
           user: {
-            id: user.id,
+            userId: user.userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -462,13 +437,13 @@ export class AuthController {
       }
 
       // Get user stats
-      const stats = await UserService.getUserStats(req.user.id, this.pool);
+      const stats = await UserService.getUserStats(req.user.userId, this.pool);
 
       res.json({
         success: true,
         data: {
           user: {
-            id: req.user.id,
+            userId: req.user.userId,
             email: req.user.email,
             firstName: req.user.firstName,
             lastName: req.user.lastName,
@@ -513,7 +488,7 @@ export class AuthController {
 
       // Revoke all user sessions
       const revokedCount = await AuthService.revokeAllUserSessions(
-        req.user.id,
+        req.user.userId,
         this.pool
       );
 
@@ -556,7 +531,7 @@ export class AuthController {
       }
 
       const sessions = await AuthService.getUserSessions(
-        req.user.id,
+        req.user.userId,
         this.pool
       );
 

@@ -24,9 +24,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({
   if (isLoading) {
     return (
       <div className="auth-guard-loading">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-        </div>
+        <div className="loading-spinner"></div>
         <p>Loading...</p>
       </div>
     );

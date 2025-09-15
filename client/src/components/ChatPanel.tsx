@@ -1,34 +1,32 @@
 import { useState, useCallback, useEffect } from "react";
-import type { ChatResponse } from "../types";
 import { API_BASE } from "../constants";
 import { useAuth } from "../contexts/AuthContext";
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  documentIds: string[];
-  timestamp: string;
-  metadata: Record<string, unknown>;
-}
+import { useStreamingChat } from "../hooks/useStreamingChat";
 
 export function ChatPanel() {
   const { isAuthenticated, user } = useAuth();
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState(user?.id || "default"); // Use user ID as session ID
+  const [sessionId, setSessionId] = useState(user?.userId || "default");
+
+  // Use streaming chat hook
+  const {
+    messages,
+    isStreaming,
+    error,
+    sendMessage,
+    stopStreaming,
+    clearMessages,
+    clearError,
+  } = useStreamingChat(sessionId);
 
   // Update session ID when user changes
   useEffect(() => {
-    if (user?.id) {
-      console.log(`🔄 Switching to user session: ${user.id}`);
-      setSessionId(user.id);
+    if (user?.userId) {
+      setSessionId(user.userId);
     } else {
-      console.log("🔄 Switching to default session (no user)");
       setSessionId("default");
     }
-  }, [user?.id]);
+  }, [user?.userId]);
 
   // Helper function to create authenticated fetch headers
   const getAuthHeaders = useCallback(() => {
@@ -36,13 +34,11 @@ export function ChatPanel() {
       "Content-Type": "application/json",
     };
 
-    // Add Authorization header if token exists
     const accessToken = localStorage.getItem("accessToken");
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    // Add CSRF token if exists
     const csrfToken = localStorage.getItem("csrfToken");
     if (csrfToken) {
       headers["x-csrf-token"] = csrfToken;
@@ -50,31 +46,6 @@ export function ChatPanel() {
 
     return headers;
   }, []);
-
-  // Load chat history when component mounts or user authenticates
-  const loadChatHistory = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/chat/history?sessionId=${sessionId}`,
-        {
-          method: "GET",
-          headers: getAuthHeaders(),
-          credentials: "include",
-        }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.history) {
-          setMessages(data.history);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load chat history:", error);
-    }
-  }, [isAuthenticated, sessionId, getAuthHeaders]);
 
   // Clear chat history
   const clearChatHistory = useCallback(async () => {
@@ -91,21 +62,23 @@ export function ChatPanel() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          setMessages([]);
+          clearMessages();
           console.log("Chat history cleared successfully");
         }
       }
     } catch (error) {
       console.error("Failed to clear chat history:", error);
     }
-  }, [isAuthenticated, sessionId, getAuthHeaders]);
+  }, [isAuthenticated, sessionId, getAuthHeaders, clearMessages]);
 
-  // Load chat history on mount and when authentication or session changes
-  useEffect(() => {
-    loadChatHistory();
-  }, [loadChatHistory, sessionId]);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setInput(e.target.value);
+    },
+    []
+  );
 
-  const send = async () => {
+  const send = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
 
@@ -114,62 +87,21 @@ export function ChatPanel() {
       return;
     }
 
-    // Add user message to local state immediately
-    const userMessage: ChatMessage = {
-      id: `temp-${Date.now()}`,
-      role: "user",
-      content: text,
-      documentIds: [],
-      timestamp: new Date().toISOString(),
-      metadata: {},
-    };
-    setMessages((m) => [...m, userMessage]);
     setInput("");
-    setLoading(true);
+    clearError();
 
     try {
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        credentials: "include",
-        body: JSON.stringify({
-          message: text,
-          sessionId: sessionId,
-        }),
-      });
-      const data: ChatResponse = await res.json();
-      const answer = data.success ? data.message : `Error: ${data.message}`;
-
-      // Add assistant message to local state
-      const assistantMessage: ChatMessage = {
-        id: data.messageId || `temp-${Date.now()}`,
-        role: "assistant",
-        content: answer,
-        documentIds: data.sources?.map((s) => s.id) || [],
-        timestamp: new Date().toISOString(),
-        metadata: {},
-      };
-      setMessages((m) => [...m, assistantMessage]);
-    } catch (e: unknown) {
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      const errorChatMessage: ChatMessage = {
-        id: `error-${Date.now()}`,
-        role: "assistant",
-        content: `Error: ${errorMessage}`,
-        documentIds: [],
-        timestamp: new Date().toISOString(),
-        metadata: {},
-      };
-      setMessages((m) => [...m, errorChatMessage]);
-    } finally {
-      setLoading(false);
+      await sendMessage(text);
+    } catch (error) {
+      console.error("Chat error:", error);
     }
-  };
+  }, [isAuthenticated, sendMessage, clearError, input]);
 
   return (
     <section className="chat-panel">
-      <div className="chat-header">
+      <div className="chat-header-main">
         <h3>Chat History</h3>
+
         {messages.length > 0 && (
           <button
             onClick={clearChatHistory}
@@ -189,20 +121,37 @@ export function ChatPanel() {
           </div>
         ) : (
           messages.map((m) => (
-            <div key={m.id} className={`msg ${m.role}`}>
-              <div className="msg-content">{m.content}</div>
+            <div
+              key={m.id}
+              className={`msg ${m.role} ${
+                isStreaming && m.role === "assistant" && !m.messageId
+                  ? "streaming"
+                  : ""
+              }`}
+            >
+              <div className="msg-content">
+                {m.content ||
+                  (isStreaming && m.role === "assistant" ? "Thinking..." : "")}
+                {isStreaming &&
+                  m.role === "assistant" &&
+                  !m.messageId &&
+                  m.content && <span className="streaming-cursor">|</span>}
+              </div>
               <div className="msg-timestamp">
                 {new Date(m.timestamp).toLocaleTimeString()}
               </div>
             </div>
           ))
         )}
-        {loading && (
-          <div className="msg assistant loading">
-            <div className="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
+
+        {/* Show error message */}
+        {error && (
+          <div className="msg assistant error">
+            <div className="msg-content">
+              <strong>Error:</strong> {error}
+            </div>
+            <div className="msg-timestamp">
+              {new Date().toLocaleTimeString()}
             </div>
           </div>
         )}
@@ -212,19 +161,29 @@ export function ChatPanel() {
           <input
             placeholder="Ask about your documents..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={(e) => e.key === "Enter" && send()}
             className="chat-input"
             disabled={!isAuthenticated}
           />
           <div className="input-buttons">
-            <button
-              onClick={send}
-              disabled={loading || !input.trim() || !isAuthenticated}
-              className="send-button primary"
-            >
-              <span className="button-icon">→</span>
-            </button>
+            {isStreaming ? (
+              <button
+                onClick={stopStreaming}
+                className="send-button stop"
+                title="Stop streaming"
+              >
+                <span className="button-icon">⏹</span>
+              </button>
+            ) : (
+              <button
+                onClick={send}
+                disabled={!input.trim() || !isAuthenticated}
+                className="send-button primary"
+              >
+                <span className="button-icon">→</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { body, param, query } from "express-validator";
 import { Pool } from "pg";
 import { UserController } from "../controllers/userController";
 import {
@@ -7,6 +6,19 @@ import {
   requireAdmin,
   requireRoles,
 } from "../middleware/authMiddleware";
+import {
+  validateBody,
+  validateQuery,
+  validateParams,
+} from "../middleware/validationMiddleware";
+import {
+  profileUpdateSchema,
+  passwordChangeSchema,
+  userUpdateSchema,
+  userIdSchema,
+  paginationSchema,
+  searchSchema,
+} from "../schemas/authSchemas";
 
 /**
  * Create user management routes
@@ -16,88 +28,6 @@ import {
 export function createUserRoutes(pool: Pool): Router {
   const router = Router();
   const userController = new UserController(pool);
-
-  // Validation rules
-  const profileUpdateValidation = [
-    body("firstName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("First name must be between 1 and 100 characters"),
-    body("lastName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("Last name must be between 1 and 100 characters"),
-    body("avatarUrl")
-      .optional()
-      .isURL()
-      .withMessage("Avatar URL must be a valid URL"),
-  ];
-
-  const passwordChangeValidation = [
-    body("currentPassword")
-      .notEmpty()
-      .withMessage("Current password is required"),
-    body("newPassword")
-      .isLength({ min: 8 })
-      .withMessage("New password must be at least 8 characters long")
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage(
-        "New password must contain at least one lowercase letter, one uppercase letter, and one number"
-      ),
-  ];
-
-  const userUpdateValidation = [
-    body("firstName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("First name must be between 1 and 100 characters"),
-    body("lastName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("Last name must be between 1 and 100 characters"),
-    body("avatarUrl")
-      .optional()
-      .isURL()
-      .withMessage("Avatar URL must be a valid URL"),
-    body("role")
-      .optional()
-      .isIn(["admin", "user", "viewer"])
-      .withMessage("Role must be one of: admin, user, viewer"),
-    body("isActive")
-      .optional()
-      .isBoolean()
-      .withMessage("isActive must be a boolean value"),
-    body("isVerified")
-      .optional()
-      .isBoolean()
-      .withMessage("isVerified must be a boolean value"),
-  ];
-
-  const userIdValidation = [
-    param("id").isUUID().withMessage("User ID must be a valid UUID"),
-  ];
-
-  const paginationValidation = [
-    query("page")
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage("Page must be a positive integer"),
-    query("limit")
-      .optional()
-      .isInt({ min: 1, max: 100 })
-      .withMessage("Limit must be between 1 and 100"),
-  ];
-
-  const searchValidation = [
-    query("q")
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("Search query must be between 1 and 100 characters"),
-  ];
 
   // User profile routes (authenticated users)
 
@@ -116,7 +46,7 @@ export function createUserRoutes(pool: Pool): Router {
   router.put(
     "/profile",
     requireAuth,
-    profileUpdateValidation,
+    validateBody(profileUpdateSchema),
     userController.updateProfile
   );
 
@@ -128,7 +58,7 @@ export function createUserRoutes(pool: Pool): Router {
   router.put(
     "/password",
     requireAuth,
-    passwordChangeValidation,
+    validateBody(passwordChangeSchema),
     userController.changePassword
   );
 
@@ -139,7 +69,12 @@ export function createUserRoutes(pool: Pool): Router {
    * @desc    Get all users (with pagination)
    * @access  Admin
    */
-  router.get("/", requireAdmin, paginationValidation, userController.getUsers);
+  router.get(
+    "/",
+    requireAdmin,
+    validateQuery(paginationSchema),
+    userController.getUsers
+  );
 
   /**
    * @route   GET /api/users/search
@@ -149,7 +84,7 @@ export function createUserRoutes(pool: Pool): Router {
   router.get(
     "/search",
     requireAdmin,
-    searchValidation,
+    validateQuery(searchSchema),
     userController.searchUsers
   );
 
@@ -161,7 +96,7 @@ export function createUserRoutes(pool: Pool): Router {
   router.get(
     "/:id",
     requireAdmin,
-    userIdValidation,
+    validateParams(userIdSchema),
     userController.getUserById
   );
 
@@ -173,8 +108,8 @@ export function createUserRoutes(pool: Pool): Router {
   router.put(
     "/:id",
     requireAdmin,
-    userIdValidation,
-    userUpdateValidation,
+    validateParams(userIdSchema),
+    validateBody(userUpdateSchema),
     userController.updateUser
   );
 
@@ -186,7 +121,7 @@ export function createUserRoutes(pool: Pool): Router {
   router.delete(
     "/:id",
     requireAdmin,
-    userIdValidation,
+    validateParams(userIdSchema),
     userController.deleteUser
   );
 

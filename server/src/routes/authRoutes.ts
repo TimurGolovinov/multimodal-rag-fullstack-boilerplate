@@ -1,9 +1,14 @@
 import { Router } from "express";
-import { body } from "express-validator";
 import { Pool } from "pg";
 import { AuthController } from "../controllers/authController";
 import { requireAuth } from "../middleware/authMiddleware";
 import { CSRFMiddleware } from "../middleware/csrfMiddleware";
+import { validateBody } from "../middleware/validationMiddleware";
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+} from "../schemas/authSchemas";
 
 /**
  * Create authentication routes
@@ -13,43 +18,6 @@ import { CSRFMiddleware } from "../middleware/csrfMiddleware";
 export function createAuthRoutes(pool: Pool): Router {
   const router = Router();
   const authController = new AuthController(pool);
-
-  // Validation rules
-  const registerValidation = [
-    body("email")
-      .isEmail()
-      .normalizeEmail()
-      .withMessage("Please provide a valid email address"),
-    body("password")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters long")
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage(
-        "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-      ),
-    body("firstName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("First name must be between 1 and 100 characters"),
-    body("lastName")
-      .optional()
-      .isLength({ min: 1, max: 100 })
-      .trim()
-      .withMessage("Last name must be between 1 and 100 characters"),
-  ];
-
-  const loginValidation = [
-    body("email")
-      .isEmail()
-      .normalizeEmail()
-      .withMessage("Please provide a valid email address"),
-    body("password").notEmpty().withMessage("Password is required"),
-  ];
-
-  const refreshTokenValidation = [
-    body("refreshToken").notEmpty().withMessage("Refresh token is required"),
-  ];
 
   // Public routes (no authentication required)
 
@@ -64,7 +32,7 @@ export function createAuthRoutes(pool: Pool): Router {
   router.post(
     "/register",
     CSRFMiddleware.csrfProtection,
-    registerValidation,
+    validateBody(registerSchema),
     authController.register
   );
 
@@ -76,7 +44,7 @@ export function createAuthRoutes(pool: Pool): Router {
   router.post(
     "/login",
     CSRFMiddleware.csrfProtection,
-    loginValidation,
+    validateBody(loginSchema),
     authController.login
   );
 
@@ -88,7 +56,7 @@ export function createAuthRoutes(pool: Pool): Router {
   router.post(
     "/refresh",
     CSRFMiddleware.csrfProtection,
-    refreshTokenValidation,
+    validateBody(refreshTokenSchema),
     authController.refreshToken
   );
 

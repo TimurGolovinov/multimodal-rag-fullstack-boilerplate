@@ -23,7 +23,7 @@ export class DocumentController {
         return;
       }
 
-      if (!req.user?.id) {
+      if (!req.user?.userId) {
         res.status(401).json({
           success: false,
           message: "User not authenticated",
@@ -33,7 +33,7 @@ export class DocumentController {
 
       const document = await this.documentService.uploadDocument(
         req.file,
-        req.user.id
+        req.user.userId
       );
 
       const response: UploadResponse = {
@@ -55,7 +55,7 @@ export class DocumentController {
 
   async listDocuments(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!req.user?.id) {
+      if (!req.user?.userId) {
         res.status(401).json({
           success: false,
           message: "User not authenticated",
@@ -69,7 +69,7 @@ export class DocumentController {
       const result = await this.documentService.listDocuments(
         page,
         limit,
-        req.user.id
+        req.user.userId
       );
 
       const response: ListDocumentsResponse = {
@@ -91,7 +91,7 @@ export class DocumentController {
 
   async getDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!req.user?.id) {
+      if (!req.user?.userId) {
         res.status(401).json({
           success: false,
           message: "User not authenticated",
@@ -100,7 +100,10 @@ export class DocumentController {
       }
 
       const { id } = req.params;
-      const document = await this.documentService.getDocument(id, req.user.id);
+      const document = await this.documentService.getDocument(
+        id,
+        req.user.userId
+      );
 
       if (!document) {
         res.status(404).json({
@@ -126,7 +129,7 @@ export class DocumentController {
     res: Response
   ): Promise<void> {
     try {
-      if (!req.user?.id) {
+      if (!req.user?.userId) {
         res.status(401).json({
           success: false,
           message: "User not authenticated",
@@ -135,7 +138,7 @@ export class DocumentController {
       }
 
       const { id } = req.params;
-      const ok = await this.documentService.deleteDocument(id, req.user.id);
+      const ok = await this.documentService.deleteDocument(id, req.user.userId);
       if (!ok) {
         res.status(404).json({ success: false, message: "Document not found" });
         return;

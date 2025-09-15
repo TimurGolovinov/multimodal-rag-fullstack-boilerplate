@@ -534,34 +534,38 @@ export class DocumentDatabaseService {
     documentIds: string[] = [],
     metadata: Record<string, any> = {}
   ): Promise<string> {
-    const client = await this.getPool().connect();
+    const { TransactionService } = await import(
+      "../../services/transactionService"
+    );
 
-    try {
-      const query = `
+    const result = await TransactionService.executeTransaction(
+      async (client) => {
+        const query = `
         INSERT INTO chat_messages (user_id, session_id, role, content, document_ids, metadata)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `;
-      const values = [
-        userId,
-        sessionId,
-        role,
-        content,
-        documentIds,
-        JSON.stringify(metadata),
-      ];
+        const values = [
+          userId,
+          sessionId,
+          role,
+          content,
+          documentIds,
+          JSON.stringify(metadata),
+        ];
 
-      const result = await client.query(query, values);
-      return result.rows[0].id;
-    } catch (error) {
+        const result = await client.query(query, values);
+        return result.rows[0].id;
+      }
+    );
+
+    if (!result.success) {
       throw new Error(
-        `Failed to save chat message: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        `Failed to save chat message: ${result.error || "Unknown error"}`
       );
-    } finally {
-      client.release();
     }
+
+    return result.data!;
   }
 
   /**

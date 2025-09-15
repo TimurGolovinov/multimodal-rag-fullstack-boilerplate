@@ -10,6 +10,11 @@ export function createChatRoutes(chatController: ChatController): Router {
     chatController.chat(req, res);
   });
 
+  // Stream chat with LLM about documents - REQUIRES AUTHENTICATION
+  router.post("/stream", requireAuth, (req, res) => {
+    chatController.streamChat(req, res);
+  });
+
   // Get chat history for a session - REQUIRES AUTHENTICATION
   router.get("/history", requireAuth, (req, res) => {
     chatController.getChatHistory(req, res);

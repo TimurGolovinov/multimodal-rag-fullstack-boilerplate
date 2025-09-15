@@ -17,13 +17,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 # Development stage
 FROM base AS development
 
 # Install dev dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -41,7 +41,7 @@ CMD ["npm", "run", "dev"]
 FROM base AS build
 
 # Install ALL dependencies (including dev dependencies for building)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -69,7 +69,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 # Copy built application from build stage
 COPY --from=build --chown=nodejs:nodejs /app/dist ./dist
@@ -99,7 +99,7 @@ CMD ["node", "dist/index.js"]
 FROM base AS testing
 
 # Install dev dependencies
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .

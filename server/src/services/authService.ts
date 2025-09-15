@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import * as jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { Pool, PoolClient } from "pg";
 import { PasswordService } from "./passwordService";
@@ -31,7 +31,7 @@ export interface RefreshTokenPayload {
 export interface AuthResult {
   success: boolean;
   user?: {
-    id: string;
+    userId: string; // Changed from 'id' to 'userId' for consistency
     email: string;
     firstName?: string;
     lastName?: string;
@@ -83,7 +83,7 @@ export class AuthService {
    */
   public static async generateTokens(
     user: {
-      id: string;
+      userId: string; // Changed from 'id' to 'userId' for consistency
       email: string;
       firstName?: string;
       lastName?: string;
@@ -107,7 +107,7 @@ export class AuthService {
 
       // Generate access token
       const accessTokenPayload: JWTPayload = {
-        userId: user.id,
+        userId: user.userId,
         email: user.email,
         role: user.role,
         jti,
@@ -122,7 +122,7 @@ export class AuthService {
 
       // Generate refresh token
       const refreshTokenPayload: RefreshTokenPayload = {
-        userId: user.id,
+        userId: user.userId,
         jti: refreshJti,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
@@ -147,7 +147,7 @@ export class AuthService {
           `INSERT INTO user_sessions (user_id, token_jti, refresh_token_hash, expires_at, user_agent, ip_address)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [
-            user.id,
+            user.userId,
             refreshJti,
             refreshTokenHash,
             new Date(refreshTokenPayload.exp * 1000),
@@ -159,7 +159,7 @@ export class AuthService {
         // Update user's last login
         await client.query(
           "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1",
-          [user.id]
+          [user.userId]
         );
       } finally {
         client.release();
@@ -168,7 +168,7 @@ export class AuthService {
       return {
         success: true,
         user: {
-          id: user.id,
+          userId: user.userId,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
@@ -304,7 +304,7 @@ export class AuthService {
         // Generate new tokens
         const authResult = await this.generateTokens(
           {
-            id: user.user_id,
+            userId: user.user_id,
             email: user.email,
             firstName: user.first_name,
             lastName: user.last_name,

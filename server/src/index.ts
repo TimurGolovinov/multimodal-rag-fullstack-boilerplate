@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cluster from "cluster";
 import os from "os";
 import cookieParser from "cookie-parser";
+import { createServer as createHttpServer } from "http";
 import { DocumentServiceFactory } from "./services/documentServiceFactory";
 import { DocumentService } from "./services/documentService";
 import { ChatService } from "./services/chatService";
@@ -19,6 +20,7 @@ import {
   trustProxy,
 } from "./middleware/httpsMiddleware";
 import { AuthMiddleware } from "./middleware/authMiddleware";
+import { TransactionService } from "./services/transactionService";
 
 // Load environment variables
 dotenv.config();
@@ -71,7 +73,10 @@ if (isPrimary && isProduction) {
     });
 } else {
   // Worker process (or single process in development)
-  createServer();
+  createServer().catch((error) => {
+    console.error("❌ Server startup failed:", error);
+    process.exit(1);
+  });
 }
 
 async function createServer() {
@@ -90,19 +95,38 @@ async function createServer() {
   setupMiddleware(app);
 
   // Initialize services and routes
+  TransactionService.initialize();
   const { documentController, chatController } = await initializeServices();
   setupRoutes(app, documentController, chatController);
 
+  // Create HTTP server
+  const server = createHttpServer(app);
+
   // Start server
-  app.listen(PORT, () => {
-    console.log(
-      `🚀 HOT RELOAD TEST: Server ${process.pid} started on port ${PORT}`
-    );
+  server.listen(PORT, () => {
+    console.log(`🚀 Server ${process.pid} started on port ${PORT}`);
     console.log(
       `📚 Document endpoints: http://localhost:${PORT}/api/documents`
     );
     console.log(`💬 Chat endpoint: http://localhost:${PORT}/api/chat`);
     console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  });
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    console.log("🛑 SIGTERM received, shutting down gracefully");
+    server.close(() => {
+      console.log("✅ Server closed");
+      process.exit(0);
+    });
+  });
+
+  process.on("SIGINT", () => {
+    console.log("🛑 SIGINT received, shutting down gracefully");
+    server.close(() => {
+      console.log("✅ Server closed");
+      process.exit(0);
+    });
   });
 }
 
@@ -161,26 +185,51 @@ function setupMiddleware(app: express.Application) {
     })
   );
 
-  // CORS configuration - More restrictive for security
+  // CORS configuration - Secure by default
   const corsOptions = {
     origin: function (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void
     ) {
-      // In production, reject requests without origin
-      if (process.env.NODE_ENV === "production" && !origin) {
+      // Allow requests without origin in development or when explicitly configured
+      if (!origin) {
+        const allowNoOrigin =
+          process.env.ALLOW_NO_ORIGIN === "true" ||
+          process.env.NODE_ENV === "development";
+
+        if (allowNoOrigin) {
+          console.warn(
+            "CORS: Allowing request without origin (development mode)"
+          );
+          return callback(null, true);
+        }
+
         return callback(
-          new Error("CORS: Origin header required in production"),
+          new Error("CORS: Origin header required for security"),
           false
         );
       }
 
-      // Allow requests without origin in development (for tools like Postman)
-      if (!origin && process.env.NODE_ENV !== "production") {
-        return callback(null, true);
-      }
-
       const allowedDomains = process.env.ALLOWED_DOMAINS?.split(",") || [];
+
+      // In development, add common localhost origins if none configured
+      if (
+        process.env.NODE_ENV === "development" &&
+        allowedDomains.length === 0
+      ) {
+        const devOrigins = [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://localhost:5173",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:3001",
+          "http://127.0.0.1:5173",
+        ];
+
+        if (devOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+      }
 
       // If no domains configured, reject all
       if (allowedDomains.length === 0) {
@@ -192,14 +241,35 @@ function setupMiddleware(app: express.Application) {
 
       const isAllowed = allowedDomains.some((domain) => {
         const trimmedDomain = domain.trim();
-        return (
-          origin === trimmedDomain ||
-          origin === `https://${trimmedDomain}` ||
-          origin === `http://${trimmedDomain}` ||
-          (trimmedDomain.includes("*") &&
-            origin &&
-            new RegExp(trimmedDomain.replace(/\*/g, ".*")).test(origin))
-        );
+
+        // Exact match
+        if (origin === trimmedDomain) {
+          return true;
+        }
+
+        // HTTPS match
+        if (origin === `https://${trimmedDomain}`) {
+          return true;
+        }
+
+        // HTTP match (only in development)
+        if (
+          process.env.NODE_ENV !== "production" &&
+          origin === `http://${trimmedDomain}`
+        ) {
+          return true;
+        }
+
+        // Wildcard match (with proper escaping)
+        if (trimmedDomain.includes("*")) {
+          const escapedDomain = trimmedDomain
+            .replace(/[.+?^${}()|[\]\\]/g, "\\$&") // Escape special regex chars
+            .replace(/\*/g, ".*"); // Convert * to .*
+          const regex = new RegExp(`^${escapedDomain}$`);
+          return regex.test(origin);
+        }
+
+        return false;
       });
 
       if (isAllowed) {
@@ -219,6 +289,8 @@ function setupMiddleware(app: express.Application) {
       "x-access-token",
     ],
     exposedHeaders: ["x-csrf-token"],
+    // Add security headers
+    maxAge: 86400, // Cache preflight for 24 hours
   };
 
   app.use(cors(corsOptions));

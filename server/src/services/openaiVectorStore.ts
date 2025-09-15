@@ -454,6 +454,8 @@ export class OpenAIVectorStore {
         }
       );
 
+      console.log("Search results:", searchResults, query);
+
       return searchResults.data.map((result) => ({
         id: result.file_id || "",
         content: result.content?.map((c: any) => c.text).join("\n") || "",

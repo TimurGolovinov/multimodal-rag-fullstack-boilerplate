@@ -29,9 +29,7 @@ const AppContent: React.FC = () => {
   if (isLoading) {
     return (
       <div className="app-loading">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-        </div>
+        <div className="loading-spinner"></div>
         <p>Loading...</p>
       </div>
     );

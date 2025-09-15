@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { validationResult } from "express-validator";
 import { Pool } from "pg";
 import { UserService, UpdateUserData } from "../services/userService";
 import { PasswordService } from "../services/passwordService";
@@ -41,13 +40,13 @@ export class UserController {
       }
 
       // Get user stats
-      const stats = await UserService.getUserStats(req.user.id, this.pool);
+      const stats = await UserService.getUserStats(req.user.userId, this.pool);
 
       res.json({
         success: true,
         data: {
           user: {
-            id: req.user.id,
+            id: req.user.userId,
             email: req.user.email,
             firstName: req.user.firstName,
             lastName: req.user.lastName,
@@ -90,18 +89,6 @@ export class UserController {
         return;
       }
 
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: "Please check your input data",
-          details: errors.array(),
-        });
-        return;
-      }
-
       const { firstName, lastName, avatarUrl } = req.body;
 
       // Prepare update data
@@ -112,7 +99,7 @@ export class UserController {
 
       // Update user
       const updatedUser = await UserService.updateUser(
-        req.user.id,
+        req.user.userId,
         updateData,
         this.pool
       );
@@ -131,7 +118,7 @@ export class UserController {
         message: "Profile updated successfully",
         data: {
           user: {
-            id: updatedUser.id,
+            id: updatedUser.userId,
             email: updatedUser.email,
             firstName: updatedUser.firstName,
             lastName: updatedUser.lastName,
@@ -169,18 +156,6 @@ export class UserController {
           success: false,
           error: "Authentication required",
           message: "User must be authenticated",
-        });
-        return;
-      }
-
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: "Please check your input data",
-          details: errors.array(),
         });
         return;
       }
@@ -231,7 +206,7 @@ export class UserController {
 
       // Update password
       const passwordUpdated = await UserService.updateUserPassword(
-        req.user.id,
+        req.user.userId,
         newPassword,
         this.pool
       );
@@ -286,7 +261,7 @@ export class UserController {
         success: true,
         data: {
           users: result.users.map((user) => ({
-            id: user.id,
+            id: user.userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -348,13 +323,13 @@ export class UserController {
       }
 
       // Get user stats
-      const stats = await UserService.getUserStats(user.id, this.pool);
+      const stats = await UserService.getUserStats(user.userId, this.pool);
 
       res.json({
         success: true,
         data: {
           user: {
-            id: user.id,
+            id: user.userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
@@ -397,18 +372,6 @@ export class UserController {
         return;
       }
 
-      // Validate request
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          message: "Please check your input data",
-          details: errors.array(),
-        });
-        return;
-      }
-
       const { id } = req.params;
       const { firstName, lastName, avatarUrl, role, isActive, isVerified } =
         req.body;
@@ -443,7 +406,7 @@ export class UserController {
         message: "User updated successfully",
         data: {
           user: {
-            id: updatedUser.id,
+            id: updatedUser.userId,
             email: updatedUser.email,
             firstName: updatedUser.firstName,
             lastName: updatedUser.lastName,
@@ -488,7 +451,7 @@ export class UserController {
       const { id } = req.params;
 
       // Prevent admin from deleting themselves
-      if (id === req.user.id) {
+      if (id === req.user.userId) {
         res.status(400).json({
           success: false,
           error: "Cannot delete self",
@@ -557,7 +520,7 @@ export class UserController {
         success: true,
         data: {
           users: users.map((user) => ({
-            id: user.id,
+            id: user.userId,
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,

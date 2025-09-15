@@ -44,7 +44,6 @@ export class ChatService {
         3,
         userId
       );
-      console.log("Relevant docs", relevantDocs);
 
       // Get recent chat history for context window
       const recentMessages = await this.dbService!.getRecentChatMessages(
@@ -56,8 +55,6 @@ export class ChatService {
       // Format results and create context
       const formattedResults = this.formatResults(relevantDocs);
       const textSources = this.createContext(relevantDocs);
-      console.log("Formatted results", formattedResults);
-      console.log("Text sources", textSources);
 
       // Build messages array with context window
       const messages: Array<{
@@ -95,8 +92,6 @@ export class ChatService {
         response.choices[0]?.message?.content ||
         "Sorry, I could not generate a response.";
 
-      console.log("Completion response:", assistantMessage);
-
       // Save assistant message to database
       const assistantMessageId = await this.dbService!.saveChatMessage(
         userId,
@@ -129,12 +124,32 @@ export class ChatService {
       return "No relevant documents found.";
     }
 
-    return documents
-      .map(
-        (doc, index) =>
-          `Document ${index + 1} (${doc.filename}):\n${doc.content}`
-      )
+    const MAX_CHARS_PER_DOC = 2000; // Limit each document to 2000 characters
+    const MAX_TOTAL_CHARS = 8000; // Limit total context to 8000 characters
+    let totalChars = 0;
+
+    const formattedDocs = documents
+      .map((doc, index) => {
+        // Truncate document content if it's too long
+        let content = doc.content;
+        if (content.length > MAX_CHARS_PER_DOC) {
+          content = content.substring(0, MAX_CHARS_PER_DOC) + "... [truncated]";
+        }
+
+        const docText = `Document ${index + 1} (${doc.filename}):\n${content}`;
+
+        // Check if adding this document would exceed the total limit
+        if (totalChars + docText.length > MAX_TOTAL_CHARS) {
+          return null; // Skip this document
+        }
+
+        totalChars += docText.length;
+        return docText;
+      })
+      .filter(Boolean) // Remove null entries
       .join("\n\n");
+
+    return formattedDocs || "No relevant documents found.";
   }
 
   private createContext(documents: Document[]): string {
@@ -142,10 +157,30 @@ export class ChatService {
       return "No relevant documents found.";
     }
 
-    // Join the text content of all results
-    const textSources = documents.map((doc) => doc.content).join("\n");
+    const MAX_CHARS_PER_DOC = 2000; // Limit each document to 2000 characters
+    const MAX_TOTAL_CHARS = 8000; // Limit total context to 8000 characters
+    let totalChars = 0;
 
-    return textSources;
+    const textSources = documents
+      .map((doc) => {
+        // Truncate document content if it's too long
+        let content = doc.content;
+        if (content.length > MAX_CHARS_PER_DOC) {
+          content = content.substring(0, MAX_CHARS_PER_DOC) + "... [truncated]";
+        }
+
+        // Check if adding this document would exceed the total limit
+        if (totalChars + content.length > MAX_TOTAL_CHARS) {
+          return null; // Skip this document
+        }
+
+        totalChars += content.length;
+        return content;
+      })
+      .filter(Boolean) // Remove null entries
+      .join("\n");
+
+    return textSources || "No relevant documents found.";
   }
 
   /**
@@ -192,5 +227,141 @@ export class ChatService {
   > {
     await this.ensureDatabaseService();
     return await this.dbService!.getChatSessions(userId);
+  }
+
+  /**
+   * Save user message to database
+   */
+  async saveUserMessage(
+    userId: string,
+    sessionId: string,
+    message: string,
+    documentIds: string[] = []
+  ): Promise<string> {
+    try {
+      await this.ensureDatabaseService();
+      return await this.dbService!.saveChatMessage(
+        userId,
+        sessionId,
+        "user",
+        message,
+        documentIds
+      );
+    } catch (error) {
+      console.error(`❌ Failed to save user message:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save assistant message to database
+   */
+  async saveAssistantMessage(
+    userId: string,
+    sessionId: string,
+    message: string,
+    documentIds: string[] = []
+  ): Promise<string> {
+    try {
+      await this.ensureDatabaseService();
+      return await this.dbService!.saveChatMessage(
+        userId,
+        sessionId,
+        "assistant",
+        message,
+        documentIds
+      );
+    } catch (error) {
+      console.error(`❌ Failed to save assistant message:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save both user and assistant messages in a single transaction
+   * This ensures data consistency for chat conversations
+   */
+  async saveChatConversation(
+    userId: string,
+    sessionId: string,
+    userMessage: string,
+    assistantMessage: string,
+    documentIds: string[] = []
+  ): Promise<{ userMessageId: string; assistantMessageId: string }> {
+    try {
+      await this.ensureDatabaseService();
+
+      const { TransactionService } = await import("./transactionService");
+
+      const result = await TransactionService.executeTransaction(
+        async (client) => {
+          // Save user message
+          const userQuery = `
+          INSERT INTO chat_messages (user_id, session_id, role, content, document_ids, metadata)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+          const userValues = [
+            userId,
+            sessionId,
+            "user",
+            userMessage,
+            documentIds,
+            JSON.stringify({}),
+          ];
+          const userResult = await client.query(userQuery, userValues);
+
+          // Save assistant message
+          const assistantQuery = `
+          INSERT INTO chat_messages (user_id, session_id, role, content, document_ids, metadata)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+          const assistantValues = [
+            userId,
+            sessionId,
+            "assistant",
+            assistantMessage,
+            documentIds,
+            JSON.stringify({}),
+          ];
+          const assistantResult = await client.query(
+            assistantQuery,
+            assistantValues
+          );
+
+          return {
+            userMessageId: userResult.rows[0].id,
+            assistantMessageId: assistantResult.rows[0].id,
+          };
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(
+          `Failed to save chat conversation: ${result.error || "Unknown error"}`
+        );
+      }
+
+      return result.data!;
+    } catch (error) {
+      console.error(`❌ Failed to save chat conversation:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get relevant documents for context
+   */
+  async getRelevantDocuments(
+    message: string,
+    userId: string
+  ): Promise<Document[]> {
+    try {
+      return await this.documentService.searchDocuments(message, 3, userId);
+    } catch (error) {
+      console.error(`❌ Failed to get relevant documents:`, error);
+      return [];
+    }
   }
 }

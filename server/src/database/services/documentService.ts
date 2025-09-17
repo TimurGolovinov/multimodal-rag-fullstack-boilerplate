@@ -13,6 +13,7 @@ export interface DocumentCreateData {
   thumbnailPath?: string;
   metadata?: Record<string, any>;
   userId: string;
+  externalId?: string;
 }
 
 export interface DocumentUpdateData {
@@ -21,6 +22,7 @@ export interface DocumentUpdateData {
   processingStatus?: ProcessingStatus;
   errorMessage?: string;
   metadata?: Record<string, any>;
+  externalId?: string;
 }
 
 export interface DocumentQueryOptions {
@@ -68,8 +70,8 @@ export class DocumentDatabaseService {
       const query = `
         INSERT INTO documents (
           filename, original_filename, content, file_path, file_size, 
-          mime_type, document_type, thumbnail_path, metadata, user_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          mime_type, document_type, thumbnail_path, metadata, user_id, external_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *
       `;
 
@@ -84,6 +86,7 @@ export class DocumentDatabaseService {
         data.thumbnailPath || null,
         data.metadata ? JSON.stringify(data.metadata) : "{}",
         data.userId,
+        data.externalId || null,
       ];
 
       const result = await client.query(query, values);
@@ -177,6 +180,11 @@ export class DocumentDatabaseService {
       if (data.metadata !== undefined) {
         updateFields.push(`metadata = $${valueIndex++}`);
         values.push(JSON.stringify(data.metadata));
+      }
+
+      if (data.externalId !== undefined) {
+        updateFields.push(`external_id = $${valueIndex++}`);
+        values.push(data.externalId);
       }
 
       if (updateFields.length === 0) {
@@ -389,6 +397,38 @@ export class DocumentDatabaseService {
   }
 
   /**
+   * Get user documents with external IDs for vector search optimization
+   */
+  async getUserDocumentsWithExternalIds(userId: string): Promise<{ id: string; externalId: string }[]> {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        SELECT id, external_id 
+        FROM documents 
+        WHERE user_id = $1 AND external_id IS NOT NULL
+        ORDER BY uploaded_at DESC
+      `;
+      const values = [userId];
+
+      const result = await client.query(query, values);
+
+      return result.rows.map((row) => ({
+        id: row.id,
+        externalId: row.external_id,
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to get user documents with external IDs: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get document statistics for a specific user
    */
   async getDocumentStats(userId: string): Promise<{
@@ -520,6 +560,7 @@ export class DocumentDatabaseService {
       mimeType: row.mime_type,
       processingStatus: row.processing_status,
       errorMessage: row.error_message,
+      externalId: row.external_id,
     };
   }
 

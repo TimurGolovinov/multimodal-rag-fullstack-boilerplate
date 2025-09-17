@@ -142,26 +142,31 @@ export class OpenAIVectorStore {
       await this.waitForFileProcessing(file.id);
 
       // Add file to vector store with metadata and chunking strategy
-      await this.openai.vectorStores.files.create(this.vectorStoreId!, {
-        file_id: file.id,
-        attributes: {
-          document_id: documentId,
-          filename: metadata.filename,
-          type: metadata.type,
-          uploaded_at: metadata.uploadedAt,
-          size: metadata.size,
-          mimetype: metadata.mimetype,
-          user_id: metadata.userId,
-        },
-        // Optional: customize chunking strategy (using OpenAI defaults)
-        chunking_strategy: {
-          type: "static",
-          static: {
-            max_chunk_size_tokens: 800, // OpenAI default
-            chunk_overlap_tokens: 400, // OpenAI default
+      const fileInVectorStore = await this.openai.vectorStores.files.create(
+        this.vectorStoreId!,
+        {
+          file_id: file.id,
+          attributes: {
+            document_id: documentId,
+            filename: metadata.filename,
+            type: metadata.type,
+            uploaded_at: metadata.uploadedAt,
+            size: metadata.size,
+            mimetype: metadata.mimetype,
+            user_id: metadata.userId,
           },
-        },
-      });
+          // Optional: customize chunking strategy (using OpenAI defaults)
+          chunking_strategy: {
+            type: "static",
+            static: {
+              max_chunk_size_tokens: 800, // OpenAI default
+              chunk_overlap_tokens: 400, // OpenAI default
+            },
+          },
+        }
+      );
+
+      console.log("File in vector store:", fileInVectorStore);
 
       console.log(
         `Successfully added document "${metadata.filename}" to vector store`
@@ -188,25 +193,51 @@ export class OpenAIVectorStore {
     }
   }
 
-  async search(query: string, limit: number = 5): Promise<SearchResult[]> {
+  async search(
+    query: string,
+    limit: number = 5,
+    fileIds?: string[]
+  ): Promise<SearchResult[]> {
     if (!this.isInitialized || !this.vectorStoreId) {
       throw new Error("Vector store not initialized");
     }
 
     try {
+      // If fileIds are provided, we need to search more broadly and filter
+      // since the API doesn't support file_ids parameter in search
+      const searchLimit = fileIds && fileIds.length > 0 ? limit * 3 : limit;
+
       // Search with OpenAI's built-in features for better results
       const searchResults = await this.openai.vectorStores.search(
         this.vectorStoreId,
         {
           query,
-          max_num_results: limit,
+          max_num_results: searchLimit,
           // Enable query rewriting for better search results
           rewrite_query: true,
         }
       );
+      console.log(
+        "Search results:",
+        searchResults,
+        query,
+        fileIds,
+        searchLimit
+      );
+
+      // Filter results by file IDs if provided
+      let filteredResults = searchResults.data;
+      if (fileIds && fileIds.length > 0) {
+        filteredResults = searchResults.data.filter(
+          (result) => result.file_id && fileIds.includes(result.file_id)
+        );
+
+        // Limit to requested number of results after filtering
+        filteredResults = filteredResults.slice(0, limit);
+      }
 
       // OpenAI already provides the content in the right format
-      return searchResults.data.map((result) => ({
+      return filteredResults.map((result) => ({
         id: result.file_id || "",
         content: result.content?.map((c: any) => c.text).join("\n") || "",
         metadata: {
@@ -427,6 +458,33 @@ export class OpenAIVectorStore {
     } catch (error) {
       console.error("Failed to get document chunk count:", error);
       return 0;
+    }
+  }
+
+  /**
+   * Get files by document ID
+   */
+  async getFilesByDocumentId(
+    documentId: string
+  ): Promise<{ id: string; filename: string }[]> {
+    if (!this.isInitialized || !this.vectorStoreId) {
+      return [];
+    }
+
+    try {
+      const files = await this.openai.vectorStores.files.list(
+        this.vectorStoreId
+      );
+
+      return files.data
+        .filter((file) => file.attributes?.document_id === documentId)
+        .map((file) => ({
+          id: file.id,
+          filename: String(file.attributes?.filename || "unknown"),
+        }));
+    } catch (error) {
+      console.error("Failed to get files by document ID:", error);
+      return [];
     }
   }
 

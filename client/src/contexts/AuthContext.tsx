@@ -42,7 +42,6 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: null,
       };
     case "AUTH_SUCCESS":
-      console.log("Auth reducer, Auth success:", action.payload);
       return {
         ...state,
         user: action.payload,

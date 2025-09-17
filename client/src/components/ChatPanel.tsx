@@ -101,17 +101,6 @@ export function ChatPanel() {
     <section className="chat-panel">
       <div className="chat-header-main">
         <h3>Chat History</h3>
-
-        {messages.length > 0 && (
-          <button
-            onClick={clearChatHistory}
-            disabled={!isAuthenticated || messages.length === 0}
-            className="clear-button"
-            title="Clear chat history"
-          >
-            🗑️
-          </button>
-        )}
       </div>
 
       <div className="chat-box">
@@ -157,6 +146,16 @@ export function ChatPanel() {
         )}
       </div>
       <div className="input-container">
+        {messages.length > 0 && (
+          <button
+            onClick={clearChatHistory}
+            disabled={!isAuthenticated || messages.length === 0}
+            className="clear-button"
+            title="Clear chat history"
+          >
+            🗑️
+          </button>
+        )}
         <div className="input-wrapper">
           <input
             placeholder="Ask about your documents..."

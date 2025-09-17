@@ -13,6 +13,7 @@ export interface Document {
   mimeType?: string;
   processingStatus?: ProcessingStatus;
   errorMessage?: string;
+  externalId?: string; // OpenAI vector store file ID
 }
 
 export type DocumentType =
@@ -124,6 +125,7 @@ export interface DatabaseDocument {
   metadata: Record<string, any>;
   processing_status: ProcessingStatus;
   error_message?: string;
+  external_id?: string; // OpenAI vector store file ID
 }
 
 export interface FileStorageRecord {

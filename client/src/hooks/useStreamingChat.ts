@@ -128,7 +128,6 @@ export const useStreamingChat = (sessionId: string) => {
   // Send message with robust streaming implementation
   const sendMessage = useCallback(
     async (message: string, documentIds?: string[]) => {
-      console.log("Sending message:", message, user);
       if (!user?.userId) {
         setError("User not authenticated");
         return;

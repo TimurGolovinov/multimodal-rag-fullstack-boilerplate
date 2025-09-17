@@ -60,14 +60,28 @@ export class DocumentService {
   private async ensureVectorStore() {
     if (!this.vectorStore) {
       try {
+        console.log("🔧 Initializing OpenAI Vector Store...");
         this.vectorStore = new OpenAIVectorStore();
         await this.vectorStore.initialize();
         console.log("✅ OpenAI Vector Store initialized successfully");
+
+        // Check if vector store has any documents
+        const docCount = await this.vectorStore.getDocumentCount();
+        console.log(`📊 Vector store contains ${docCount} documents`);
       } catch (error) {
         console.warn("⚠️ Failed to initialize OpenAI Vector Store:", error);
         console.warn(
           "⚠️ Vector search will be disabled, falling back to text search"
         );
+        this.vectorStore = undefined;
+      }
+    } else {
+      // Check if vector store is still working
+      try {
+        const docCount = await this.vectorStore.getDocumentCount();
+        console.log(`📊 Vector store contains ${docCount} documents`);
+      } catch (error) {
+        console.warn("⚠️ Vector store check failed:", error);
         this.vectorStore = undefined;
       }
     }
@@ -145,6 +159,7 @@ export class DocumentService {
       });
 
       // Add document to vector store for semantic search
+      let externalId: string | undefined;
       try {
         await this.ensureVectorStore();
         if (this.vectorStore && content.trim().length > 0) {
@@ -156,8 +171,22 @@ export class DocumentService {
             mimetype: document.mimeType || file.mimetype,
             userId: userId,
           });
+
+          // Get the external ID from the vector store
+          // We need to find the file ID that was created
+          const files = await this.vectorStore.getFilesByDocumentId(
+            document.id
+          );
+          if (files.length > 0) {
+            externalId = files[0].id;
+
+            // Update the document with the external ID
+            await this.dbService!.updateDocument(document.id, { externalId });
+            document.externalId = externalId;
+          }
+
           console.log(
-            `✅ Document added to vector store: ${document.filename}`
+            `✅ Document added to vector store: ${document.filename} (externalId: ${externalId})`
           );
         } else if (!this.vectorStore) {
           console.warn(
@@ -285,30 +314,65 @@ export class DocumentService {
         await this.ensureVectorStore();
         if (this.vectorStore) {
           console.log(
-            `🔍 HOT RELOAD TEST: Performing vector search for: "${query}"`
+            `🔍 Performing optimized vector search for: "${query}" (userId: ${userId})`
           );
-          const vectorResults = await this.vectorStore.search(query, limit);
+
+          // Get user's documents with external IDs first
+          const userDocuments =
+            await this.dbService!.getUserDocumentsWithExternalIds(userId);
+          console.log(
+            `🔍 Found ${userDocuments.length} user documents with external IDs`
+          );
+
+          if (userDocuments.length === 0) {
+            console.log(
+              "🔍 No documents with external IDs found, falling back to text search"
+            );
+            return await this.dbService!.searchDocuments(query, limit, userId);
+          }
+
+          // Extract external IDs for vector search
+          const externalIds = userDocuments.map((doc) => doc.externalId);
+          console.log(
+            `🔍 Searching vector store with ${externalIds.length} file IDs`
+          );
+
+          const vectorResults = await this.vectorStore.search(
+            query,
+            limit,
+            externalIds
+          );
+
+          console.log(
+            "Searching results:",
+            vectorResults,
+            query,
+            externalIds,
+            limit
+          );
+
           console.log("🔍 Vector results count:", vectorResults.length);
-          console.log("🔍 Vector results", vectorResults);
+          console.log(
+            "🔍 Vector results metadata:",
+            vectorResults.map((r) => ({
+              id: r.id,
+              filename: r.metadata.filename,
+              score: r.score,
+            }))
+          );
+
           if (vectorResults.length > 0) {
-            // Convert vector store results to Document format and filter by userId
+            // Convert vector store results to Document format
             const documents: Document[] = [];
             for (const result of vectorResults) {
-              // First check if the document belongs to the user
-              const resultUserId = result.metadata.user_id;
-              if (resultUserId !== userId) {
-                console.log(
-                  `🔍 Skipping document ${result.metadata.document_id} - belongs to user ${resultUserId}, searching for user ${userId}`
-                );
-                continue;
-              }
-
-              // Get the full document from database to ensure we have all fields
-              const docId = result.metadata.document_id;
-              if (docId) {
+              // Find the corresponding database document
+              const userDoc = userDocuments.find(
+                (doc) => doc.externalId === result.id
+              );
+              if (userDoc) {
                 try {
                   const fullDoc = await this.dbService!.getDocument(
-                    docId,
+                    userDoc.id,
                     userId
                   );
                   if (fullDoc) {
@@ -316,7 +380,7 @@ export class DocumentService {
                   }
                 } catch (dbError) {
                   console.warn(
-                    `⚠️ Could not fetch document ${docId} from database:`,
+                    `⚠️ Could not fetch document ${userDoc.id} from database:`,
                     dbError
                   );
                 }
@@ -325,7 +389,7 @@ export class DocumentService {
 
             if (documents.length > 0) {
               console.log(
-                `✅ Vector search found ${documents.length} documents`
+                `✅ Optimized vector search found ${documents.length} documents`
               );
               return documents;
             }
@@ -344,7 +408,22 @@ export class DocumentService {
 
       // Fallback to text search
       console.warn("⚠️ Falling back to text-based search");
-      return await this.dbService!.searchDocuments(query, limit, userId);
+      console.log(`🔍 Database search for: "${query}" (userId: ${userId})`);
+      const dbResults = await this.dbService!.searchDocuments(
+        query,
+        limit,
+        userId
+      );
+      console.log(`🔍 Database results count: ${dbResults.length}`);
+      console.log(
+        `🔍 Database results:`,
+        dbResults.map((d) => ({
+          id: d.id,
+          filename: d.filename,
+          metadata: d.metadata,
+        }))
+      );
+      return dbResults;
     } catch (error) {
       console.error(`❌ Failed to search documents:`, error);
       throw error;

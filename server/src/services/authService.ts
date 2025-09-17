@@ -67,11 +67,16 @@ export interface SessionInfo {
  * - Secure token storage
  */
 export class AuthService {
-  private static readonly ACCESS_TOKEN_EXPIRY = "15m"; // 15 minutes
+  private static readonly ACCESS_TOKEN_EXPIRY = "24h"; // 24 hours (1 day)
   private static readonly REFRESH_TOKEN_EXPIRY = "7d"; // 7 days
-  private static readonly JWT_SECRET = process.env.JWT_SECRET;
-  private static readonly REFRESH_TOKEN_SECRET =
-    process.env.REFRESH_TOKEN_SECRET;
+
+  private static getJWT_SECRET(): string | undefined {
+    return process.env.JWT_SECRET;
+  }
+
+  private static getREFRESH_TOKEN_SECRET(): string | undefined {
+    return process.env.REFRESH_TOKEN_SECRET;
+  }
 
   /**
    * Generate access and refresh tokens for a user
@@ -96,7 +101,7 @@ export class AuthService {
   ): Promise<AuthResult> {
     try {
       // Validate required environment variables
-      if (!this.JWT_SECRET || !this.REFRESH_TOKEN_SECRET) {
+      if (!this.getJWT_SECRET() || !this.getREFRESH_TOKEN_SECRET()) {
         throw new Error(
           "JWT secrets not configured. Please set JWT_SECRET and REFRESH_TOKEN_SECRET environment variables."
         );
@@ -112,10 +117,10 @@ export class AuthService {
         role: user.role,
         jti,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 15 * 60, // 15 minutes
+        exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours (1 day)
       };
 
-      const accessToken = jwt.sign(accessTokenPayload, this.JWT_SECRET, {
+      const accessToken = jwt.sign(accessTokenPayload, this.getJWT_SECRET()!, {
         issuer: "rag-app",
         audience: "rag-client",
       });
@@ -130,7 +135,7 @@ export class AuthService {
 
       const refreshToken = jwt.sign(
         refreshTokenPayload,
-        this.REFRESH_TOKEN_SECRET,
+        this.getREFRESH_TOKEN_SECRET()!,
         {
           issuer: "rag-app",
           audience: "rag-client",
@@ -194,12 +199,12 @@ export class AuthService {
    */
   public static validateAccessToken(token: string): JWTPayload | null {
     try {
-      if (!this.JWT_SECRET) {
+      if (!this.getJWT_SECRET()) {
         console.error("JWT_SECRET not configured");
         return null;
       }
 
-      const decoded = jwt.verify(token, this.JWT_SECRET, {
+      const decoded = jwt.verify(token, this.getJWT_SECRET()!, {
         issuer: "rag-app",
         audience: "rag-client",
       }) as JWTPayload;
@@ -226,12 +231,12 @@ export class AuthService {
     token: string
   ): RefreshTokenPayload | null {
     try {
-      if (!this.REFRESH_TOKEN_SECRET) {
+      if (!this.getREFRESH_TOKEN_SECRET()) {
         console.error("REFRESH_TOKEN_SECRET not configured");
         return null;
       }
 
-      const decoded = jwt.verify(token, this.REFRESH_TOKEN_SECRET, {
+      const decoded = jwt.verify(token, this.getREFRESH_TOKEN_SECRET()!, {
         issuer: "rag-app",
         audience: "rag-client",
       }) as RefreshTokenPayload;

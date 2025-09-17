@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { AuthGuard } from "./components/auth";
 import { ChatPanel, KnowledgeHub, GlobalUserProfile } from "./components";
 import AuthPage from "./pages/AuthPage";
+import { useAuthChecker } from "./hooks/useAuthChecker";
 import "./App.css";
 
 // Main app component that requires authentication
@@ -25,6 +26,13 @@ const MainApp: React.FC = () => {
 // App component with routing
 const AppContent: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Enable global authentication checking
+  useAuthChecker({
+    checkInterval: 5 * 60 * 1000, // Check every 5 minutes
+    refreshThreshold: 30 * 60 * 1000, // Refresh 30 minutes before expiration
+    enabled: true,
+  });
 
   if (isLoading) {
     return (

@@ -288,7 +288,19 @@ class AuthService {
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return !!this.accessToken;
+    if (!this.accessToken) {
+      return false;
+    }
+
+    // Check if token is expired
+    try {
+      const payload = JSON.parse(atob(this.accessToken.split(".")[1]));
+      const now = Math.floor(Date.now() / 1000);
+      return payload.exp > now;
+    } catch (error) {
+      console.error("Failed to decode token:", error);
+      return false;
+    }
   }
 
   /**
@@ -303,6 +315,28 @@ class AuthService {
    */
   getRefreshToken(): string | null {
     return this.refreshToken;
+  }
+
+  /**
+   * Check if access token needs refresh
+   * @param thresholdMinutes - Minutes before expiration to consider refresh needed
+   */
+  needsRefresh(thresholdMinutes: number = 30): boolean {
+    if (!this.accessToken) {
+      return false;
+    }
+
+    try {
+      const payload = JSON.parse(atob(this.accessToken.split(".")[1]));
+      const now = Math.floor(Date.now() / 1000);
+      const timeUntilExpiration = payload.exp - now;
+      const thresholdSeconds = thresholdMinutes * 60;
+
+      return timeUntilExpiration <= thresholdSeconds;
+    } catch (error) {
+      console.error("Failed to decode token for refresh check:", error);
+      return true; // If we can't decode, assume it needs refresh
+    }
   }
 
   /**

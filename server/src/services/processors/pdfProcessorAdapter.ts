@@ -12,11 +12,17 @@ export class PdfProcessorAdapter implements DocumentProcessor {
     filename: string
   ): Promise<{ content: string; thumbnail?: string }> {
     console.log(`Processing PDF "${filename}"...`);
+    console.log(
+      `🔍 PDFProcessor debug - Buffer length: ${buffer.length} bytes`
+    );
 
     try {
       const pdfParse = require("pdf-parse");
       const data = await pdfParse(buffer);
       console.log("PDF parsed", data);
+      console.log(
+        `🔍 PDFProcessor debug - Extracted text length: ${data.text.length} characters`
+      );
 
       return {
         content: data.text,

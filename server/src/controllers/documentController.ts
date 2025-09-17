@@ -31,6 +31,21 @@ export class DocumentController {
         return;
       }
 
+      // Debug logging for file upload
+      console.log(
+        `🔍 File upload debug - Original name: ${req.file.originalname}`
+      );
+      console.log(`🔍 File upload debug - MIME type: ${req.file.mimetype}`);
+      console.log(`🔍 File upload debug - Size: ${req.file.size} bytes`);
+      console.log(
+        `🔍 File upload debug - Buffer length: ${req.file.buffer.length} bytes`
+      );
+      console.log(
+        `🔍 File upload debug - Buffer equals size: ${
+          req.file.buffer.length === req.file.size
+        }`
+      );
+
       const document = await this.documentService.uploadDocument(
         req.file,
         req.user.userId

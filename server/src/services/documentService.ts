@@ -96,6 +96,10 @@ export class DocumentService {
   ): Promise<Document> {
     try {
       console.log(`📤 Uploading document: ${file.originalname}`);
+      console.log(`🔍 DocumentService debug - File size: ${file.size} bytes`);
+      console.log(
+        `🔍 DocumentService debug - Buffer length: ${file.buffer.length} bytes`
+      );
 
       // Extract text content
       const content = await this.extractText(file);
@@ -105,7 +109,13 @@ export class DocumentService {
       );
 
       // Store file in storage
+      console.log(
+        `🔍 Before storage - File size: ${file.size} bytes, Buffer length: ${file.buffer.length} bytes`
+      );
       const storedFile = await this.storageService.storeFile(file, "documents");
+      console.log(
+        `🔍 After storage - Stored file size: ${storedFile.fileSize} bytes`
+      );
 
       // Extract thumbnail if available
       let thumbnailPath: string | undefined;
@@ -163,7 +173,16 @@ export class DocumentService {
       try {
         await this.ensureVectorStore();
         if (this.vectorStore && content.trim().length > 0) {
-          await this.vectorStore.addDocument(document.id, content, {
+          // For binary files (PDFs, images, audio, video, office docs, archives),
+          // pass the original file buffer to preserve the full file
+          // For text files, use the extracted text content
+          const isBinaryFile = this.isBinaryFileType(
+            documentType,
+            file.mimetype
+          );
+          const vectorContent = isBinaryFile ? file.buffer : content;
+
+          await this.vectorStore.addDocument(document.id, vectorContent, {
             filename: document.filename,
             type: documentType,
             uploadedAt: document.uploadedAt.toISOString(),
@@ -198,7 +217,18 @@ export class DocumentService {
           );
         }
       } catch (vectorError) {
-        console.warn("⚠️ Failed to add document to vector store:", vectorError);
+        console.error(
+          "❌ Failed to add document to vector store:",
+          vectorError
+        );
+        console.error("❌ Vector error details:", {
+          message:
+            vectorError instanceof Error
+              ? vectorError.message
+              : "Unknown error",
+          stack: vectorError instanceof Error ? vectorError.stack : undefined,
+          name: vectorError instanceof Error ? vectorError.name : undefined,
+        });
         console.warn(
           "⚠️ Document uploaded successfully but vector search will not work for this document"
         );
@@ -552,6 +582,26 @@ export class DocumentService {
       return "word";
 
     return "text"; // Default fallback
+  }
+
+  /**
+   * Determine if a file type should use the original buffer instead of extracted text
+   * @param documentType - The document type
+   * @param mimeType - The MIME type
+   * @returns True if the file should use the original buffer
+   */
+  private isBinaryFileType(
+    documentType: DocumentType,
+    mimeType: string
+  ): boolean {
+    // Text files should use extracted content
+    if (documentType === "text") {
+      return false;
+    }
+
+    // All other types are binary and should use original buffer
+    // This includes: pdf, image, audio, video, word (office docs)
+    return true;
   }
 
   /**

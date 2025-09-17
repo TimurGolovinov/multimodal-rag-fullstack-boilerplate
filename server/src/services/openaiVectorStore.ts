@@ -75,7 +75,7 @@ export class OpenAIVectorStore {
    */
   async addDocument(
     documentId: string,
-    content: string,
+    content: string | Buffer,
     metadata: Record<string, any>
   ): Promise<void> {
     let file: any = null;
@@ -91,16 +91,23 @@ export class OpenAIVectorStore {
         throw new Error("Document content is empty");
       }
 
+      const contentType = Buffer.isBuffer(content) ? "bytes" : "characters";
       console.log(
-        `Adding document "${metadata.filename}" with ${contentLength} characters`
+        `Adding document "${metadata.filename}" with ${contentLength} ${contentType}`
       );
 
       // Show a preview of the content for debugging
-      const contentPreview = content.substring(
-        0,
-        Math.min(200, content.length)
-      );
-      console.log(`Content preview: "${contentPreview}..."`);
+      let contentPreview: string;
+      if (Buffer.isBuffer(content)) {
+        // For binary content (like PDFs), show a hex preview
+        const previewLength = Math.min(50, content.length);
+        contentPreview = content.subarray(0, previewLength).toString("hex");
+        console.log(`Content preview (hex): "${contentPreview}..."`);
+      } else {
+        // For text content, show the actual text
+        contentPreview = content.substring(0, Math.min(200, content.length));
+        console.log(`Content preview: "${contentPreview}..."`);
+      }
 
       // Create a file first, then add to vector store (simpler approach)
       // For media files (images, videos, audio), we need to use a .txt extension since we're storing text content
@@ -124,10 +131,30 @@ export class OpenAIVectorStore {
       // Create a proper File object using Node.js File constructor
       // Use the correct MIME type for better processing
       const mimeType = metadata.mimetype || "text/plain";
-      const fileBuffer = Buffer.from(content, "utf-8");
+
+      // Handle both string content and Buffer content
+      let fileBuffer: Buffer;
+      if (Buffer.isBuffer(content)) {
+        // Content is already a Buffer (e.g., PDF file)
+        fileBuffer = content;
+        console.log(
+          `📁 Using original file buffer for ${filename}, size: ${fileBuffer.length} bytes`
+        );
+      } else {
+        // Content is a string (e.g., extracted text)
+        fileBuffer = Buffer.from(content, "utf-8");
+        console.log(
+          `📁 Converting text content to buffer for ${filename}, size: ${fileBuffer.length} bytes`
+        );
+      }
+
       const fileObject = new File([fileBuffer], filename, {
         type: mimeType,
       });
+
+      console.log(
+        `📁 Creating file with OpenAI API - Filename: ${filename}, Size: ${fileBuffer.length} bytes, MIME: ${mimeType}`
+      );
 
       file = await this.openai.files.create({
         file: fileObject,
@@ -135,7 +162,7 @@ export class OpenAIVectorStore {
       });
 
       console.log(
-        `📁 File created with ID: ${file.id}, status: ${file.status}`
+        `📁 File created with ID: ${file.id}, status: ${file.status}, size: ${file.bytes} bytes`
       );
 
       // Wait for file processing to complete
@@ -265,13 +292,45 @@ export class OpenAIVectorStore {
         const file = await this.openai.files.retrieve(fileId);
         console.log(`📁 File ${fileId} status: ${file.status}`);
 
-        if (file.status === "processed") {
-          console.log(`✅ File ${fileId} processing completed successfully`);
-          return;
-        } else if (file.status === "error") {
-          throw new Error(`File ${fileId} processing failed: Unknown error`);
-        } else {
-          throw new Error(`File ${fileId} processing was cancelled`);
+        const status = file.status as string;
+        switch (status) {
+          case "processed":
+            console.log(`✅ File ${fileId} processing completed successfully`);
+            return;
+          case "error":
+            console.error(
+              `❌ File ${fileId} processing failed with status: ${status}`
+            );
+            console.error(`❌ File details:`, {
+              id: file.id,
+              filename: file.filename,
+              bytes: file.bytes,
+              status: status,
+              status_details: file.status_details,
+            });
+            throw new Error(
+              `File ${fileId} processing failed: ${
+                file.status_details || "Unknown error"
+              }`
+            );
+          case "cancelled":
+            console.error(`❌ File ${fileId} processing was cancelled`);
+            throw new Error(`File ${fileId} processing was cancelled`);
+          case "uploaded":
+          case "processing":
+            console.log(
+              `⏳ File ${fileId} still processing, status: ${status} (attempt ${
+                i + 1
+              }/${maxRetries})`
+            );
+            break;
+          default:
+            console.log(
+              `⏳ File ${fileId} unknown status: ${status} (attempt ${
+                i + 1
+              }/${maxRetries})`
+            );
+            break;
         }
 
         // Wait 2 seconds before checking again

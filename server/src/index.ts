@@ -344,8 +344,8 @@ function setupMiddleware(app: express.Application) {
   app.use(limiter);
 
   // Body parsing
-  app.use(express.json({ limit: "25mb", strict: false }));
-  app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+  app.use(express.json({ limit: "50mb", strict: false }));
+  app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
   // Cookie parsing
   app.use(cookieParser());

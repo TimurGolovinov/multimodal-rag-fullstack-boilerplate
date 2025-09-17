@@ -119,7 +119,22 @@ export class FileStorageService {
       const filePath = path.join(monthPath, storedName);
 
       // Write file
+      console.log(
+        `🔍 FileStorageService debug - Writing file: ${file.originalname}`
+      );
+      console.log(
+        `🔍 FileStorageService debug - Input buffer length: ${file.buffer.length} bytes`
+      );
+      console.log(
+        `🔍 FileStorageService debug - Input file size: ${file.size} bytes`
+      );
       await this.writeFile(filePath, file.buffer);
+
+      // Verify the written file size
+      const stats = fs.statSync(filePath);
+      console.log(
+        `🔍 FileStorageService debug - Written file size: ${stats.size} bytes`
+      );
 
       // Create stored file record
       const storedFile: StoredFile = {

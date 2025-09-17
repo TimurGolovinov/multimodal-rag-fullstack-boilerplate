@@ -58,7 +58,7 @@ export class StorageFactory {
 
     return new FileStorageService({
       basePath: process.env.UPLOAD_DIR || "./uploads",
-      maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "10485760"),
+      maxFileSize: parseInt(process.env.MAX_FILE_SIZE || "52428800"), // 50MB to match multer limit
       allowedMimeTypes: (
         process.env.ALLOWED_FILE_TYPES ||
         "text/plain,text/csv,text/html,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/gif,image/webp,audio/mpeg,audio/wav,audio/ogg,video/mp4,video/webm,video/ogg"

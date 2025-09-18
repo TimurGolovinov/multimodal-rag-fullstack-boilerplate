@@ -17,6 +17,7 @@ export interface DocumentServiceConfig {
   videoProcessor?: DocumentProcessor;
   pdfProcessor?: DocumentProcessor;
   wordProcessor?: DocumentProcessor;
+  textProcessor?: DocumentProcessor;
 }
 
 export class DocumentService {
@@ -39,6 +40,7 @@ export class DocumentService {
     if (config?.videoProcessor) this.processors.push(config.videoProcessor);
     if (config?.pdfProcessor) this.processors.push(config.pdfProcessor);
     if (config?.wordProcessor) this.processors.push(config.wordProcessor);
+    if (config?.textProcessor) this.processors.push(config.textProcessor);
 
     console.log("✅ New DocumentService initialized successfully");
   }
@@ -107,6 +109,13 @@ export class DocumentService {
         file.mimetype,
         file.originalname
       );
+
+      console.log(`🔍 File processing debug:`);
+      console.log(`  - Filename: ${file.originalname}`);
+      console.log(`  - MIME type: ${file.mimetype}`);
+      console.log(`  - Document type: ${documentType}`);
+      console.log(`  - Content length: ${content.length} characters`);
+      console.log(`  - Content preview: ${content.substring(0, 100)}...`);
 
       // Store file in storage
       console.log(
@@ -181,6 +190,17 @@ export class DocumentService {
             file.mimetype
           );
           const vectorContent = isBinaryFile ? file.buffer : content;
+
+          console.log(`🔍 Vector store content decision:`);
+          console.log(`  - Is binary file: ${isBinaryFile}`);
+          console.log(
+            `  - Using: ${isBinaryFile ? "original buffer" : "extracted text"}`
+          );
+          console.log(
+            `  - Vector content size: ${vectorContent.length} ${
+              isBinaryFile ? "bytes" : "characters"
+            }`
+          );
 
           await this.vectorStore.addDocument(document.id, vectorContent, {
             filename: document.filename,
@@ -569,19 +589,89 @@ export class DocumentService {
    * Determine document type from MIME type and filename
    */
   private getDocumentType(mimetype: string, filename: string): DocumentType {
+    // Check MIME types first
     if (mimetype.startsWith("text/")) return "text";
     if (mimetype.startsWith("image/")) return "image";
     if (mimetype.startsWith("audio/")) return "audio";
     if (mimetype.startsWith("video/")) return "video";
     if (mimetype === "application/pdf") return "pdf";
+
+    // Check for Office documents
     if (
       mimetype.includes("word") ||
-      filename.endsWith(".doc") ||
-      filename.endsWith(".docx")
-    )
+      mimetype.includes("document") ||
+      filename.toLowerCase().endsWith(".doc") ||
+      filename.toLowerCase().endsWith(".docx")
+    ) {
       return "word";
+    }
 
-    return "text"; // Default fallback
+    // Check for Excel documents
+    if (
+      mimetype.includes("excel") ||
+      mimetype.includes("spreadsheet") ||
+      filename.toLowerCase().endsWith(".xls") ||
+      filename.toLowerCase().endsWith(".xlsx")
+    ) {
+      return "word"; // Treat Excel as word-like for now
+    }
+
+    // Check for PowerPoint documents
+    if (
+      mimetype.includes("presentation") ||
+      mimetype.includes("powerpoint") ||
+      filename.toLowerCase().endsWith(".ppt") ||
+      filename.toLowerCase().endsWith(".pptx")
+    ) {
+      return "word"; // Treat PowerPoint as word-like for now
+    }
+
+    // Check file extensions as fallback
+    const ext = filename.toLowerCase().split(".").pop();
+    if (
+      ["txt", "csv", "html", "htm", "xml", "json", "md"].includes(ext || "")
+    ) {
+      return "text";
+    }
+    if (
+      ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "tiff"].includes(
+        ext || ""
+      )
+    ) {
+      return "image";
+    }
+    if (
+      ["mp3", "wav", "ogg", "flac", "aac", "m4a", "wma", "opus"].includes(
+        ext || ""
+      )
+    ) {
+      return "audio";
+    }
+    if (
+      [
+        "mp4",
+        "mov",
+        "avi",
+        "webm",
+        "mkv",
+        "flv",
+        "wmv",
+        "m4v",
+        "3gp",
+        "ogv",
+      ].includes(ext || "")
+    ) {
+      return "video";
+    }
+    if (ext === "pdf") {
+      return "pdf";
+    }
+
+    // Default fallback - but log what we're defaulting
+    console.warn(
+      `⚠️ Unknown file type, defaulting to text: ${mimetype} (${filename})`
+    );
+    return "text";
   }
 
   /**

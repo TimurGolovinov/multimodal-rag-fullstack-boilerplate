@@ -3,3 +3,4 @@ export { AudioProcessorAdapter } from "./audioProcessorAdapter";
 export { VideoProcessorAdapter } from "./videoProcessorAdapter";
 export { PdfProcessorAdapter } from "./pdfProcessorAdapter";
 export { WordProcessorAdapter } from "./wordProcessorAdapter";
+export { TextProcessorAdapter } from "./textProcessorAdapter";

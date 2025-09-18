@@ -9,21 +9,37 @@ export class VideoProcessorAdapter implements DocumentProcessor {
   }
 
   canProcess(mimetype: string, filename: string): boolean {
-    return (
-      mimetype.startsWith("video/") ||
-      [
-        "mp4",
-        "mov",
-        "avi",
-        "webm",
-        "mkv",
-        "flv",
-        "wmv",
-        "m4v",
-        "3gp",
-        "ogv",
-      ].includes(filename.split(".").pop()?.toLowerCase() || "")
-    );
+    // Check for video file extensions first
+    const parts = filename.split(".");
+    if (parts.length < 2) {
+      return false; // No extension
+    }
+
+    const ext = parts.pop()?.toLowerCase();
+    if (!ext) {
+      return false; // No extension
+    }
+
+    const videoExtensions = [
+      "mp4",
+      "mov",
+      "avi",
+      "webm",
+      "mkv",
+      "flv",
+      "wmv",
+      "m4v",
+      "3gp",
+      "ogv",
+    ];
+
+    // If it has a video extension, it's a video
+    if (videoExtensions.includes(ext)) {
+      return true;
+    }
+
+    // Check for video MIME types as fallback
+    return mimetype.startsWith("video/");
   }
 
   async extractText(
@@ -31,15 +47,43 @@ export class VideoProcessorAdapter implements DocumentProcessor {
     filename: string
   ): Promise<{ content: string; thumbnail?: string }> {
     console.log(`Processing video "${filename}" with optimized pipeline...`);
-    const result = await this.videoService.extractTextFromVideo(
-      buffer,
-      filename
-    );
-    console.log(`Video processing completed for "${filename}"`);
 
-    return {
-      content: result.content,
-      thumbnail: result.thumbnail || undefined,
-    };
+    // Handle null or undefined buffer
+    if (!buffer) {
+      console.warn(
+        `⚠️ VideoProcessor: Buffer is null or undefined for "${filename}"`
+      );
+      return {
+        content: "",
+        thumbnail: undefined,
+      };
+    }
+
+    console.log(
+      `🔍 VideoProcessor debug - Buffer length: ${buffer.length} bytes`
+    );
+
+    try {
+      const result = await this.videoService.extractTextFromVideo(
+        buffer,
+        filename
+      );
+      console.log(`Video processing completed for "${filename}"`);
+
+      return {
+        content: result.content || "", // Handle null/undefined content
+        thumbnail: result.thumbnail || undefined,
+      };
+    } catch (error) {
+      console.warn(
+        `⚠️ VideoProcessor: Failed to process "${filename}":`,
+        error instanceof Error ? error.message : "Unknown error"
+      );
+
+      return {
+        content: "",
+        thumbnail: undefined,
+      };
+    }
   }
 }

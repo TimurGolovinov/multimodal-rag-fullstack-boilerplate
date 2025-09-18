@@ -5,6 +5,7 @@ import {
   VideoProcessorAdapter,
   PdfProcessorAdapter,
   WordProcessorAdapter,
+  TextProcessorAdapter,
 } from "./processors";
 
 export class DocumentServiceFactory {
@@ -18,6 +19,7 @@ export class DocumentServiceFactory {
       videoProcessor: new VideoProcessorAdapter(),
       pdfProcessor: new PdfProcessorAdapter(),
       wordProcessor: new WordProcessorAdapter(),
+      textProcessor: new TextProcessorAdapter(),
     });
   }
 
@@ -28,6 +30,7 @@ export class DocumentServiceFactory {
     return new DocumentService({
       pdfProcessor: new PdfProcessorAdapter(),
       wordProcessor: new WordProcessorAdapter(),
+      textProcessor: new TextProcessorAdapter(),
     });
   }
 

@@ -9,12 +9,28 @@ export class ImageProcessorAdapter implements DocumentProcessor {
   }
 
   canProcess(mimetype: string, filename: string): boolean {
-    return (
-      mimetype.startsWith("image/") ||
-      ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(
-        filename.split(".").pop()?.toLowerCase() || ""
-      )
-    );
+    // Check for image file extensions first
+    const parts = filename.split(".");
+    if (parts.length < 2) {
+      return false; // No extension
+    }
+
+    const ext = parts.pop()?.toLowerCase();
+    if (!ext) {
+      return false; // No extension
+    }
+
+    const imageExtensions = [
+      "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "tiff", "tif", "ico"
+    ];
+    
+    // If it has an image extension, it's an image
+    if (imageExtensions.includes(ext)) {
+      return true;
+    }
+
+    // Check for image MIME types as fallback
+    return mimetype.startsWith("image/");
   }
 
   async extractText(
@@ -22,15 +38,40 @@ export class ImageProcessorAdapter implements DocumentProcessor {
     filename: string
   ): Promise<{ content: string; thumbnail?: string }> {
     console.log(`Processing image "${filename}"...`);
-    const result = await this.imageService.extractTextFromImage(
-      buffer,
-      filename
-    );
-    console.log(`Image processing completed for "${filename}"`);
+    
+    // Handle null or undefined buffer
+    if (!buffer) {
+      console.warn(`⚠️ ImageProcessor: Buffer is null or undefined for "${filename}"`);
+      return {
+        content: "",
+        thumbnail: undefined,
+      };
+    }
 
-    return {
-      content: result.content,
-      thumbnail: result.thumbnail,
-    };
+    console.log(`🔍 ImageProcessor debug - Buffer length: ${buffer.length} bytes`);
+
+    try {
+      const result = await this.imageService.extractTextFromImage(
+        buffer,
+        filename
+      );
+      
+      console.log(`Image processing completed for "${filename}"`);
+
+      return {
+        content: result.content || "", // Handle null/undefined content
+        thumbnail: result.thumbnail,
+      };
+    } catch (error) {
+      console.warn(
+        `⚠️ ImageProcessor: Failed to process "${filename}":`,
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      
+      return {
+        content: "",
+        thumbnail: undefined,
+      };
+    }
   }
 }

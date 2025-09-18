@@ -2,9 +2,19 @@ import { DocumentProcessor } from "../documentService";
 
 export class PdfProcessorAdapter implements DocumentProcessor {
   canProcess(mimetype: string, filename: string): boolean {
-    return (
-      mimetype === "application/pdf" || filename.toLowerCase().endsWith(".pdf")
-    );
+    // Check for PDF MIME types
+    if (mimetype === "application/pdf" || mimetype === "application/x-pdf") {
+      const parts = filename.split(".");
+      // File must have at least 2 parts (name.extension) and extension must be valid
+      if (parts.length < 2) return false;
+      const ext = parts.pop()?.toLowerCase() || "";
+      return ext === "pdf";
+    }
+
+    // Check for PDF file extension
+    const parts = filename.split(".");
+    if (parts.length < 2) return false;
+    return parts.pop()?.toLowerCase() === "pdf";
   }
 
   async extractText(
@@ -19,22 +29,24 @@ export class PdfProcessorAdapter implements DocumentProcessor {
     try {
       const pdfParse = require("pdf-parse");
       const data = await pdfParse(buffer);
-      console.log("PDF parsed", data);
-      console.log(
-        `🔍 PDFProcessor debug - Extracted text length: ${data.text.length} characters`
-      );
+
+      // Handle null or undefined text
+      const content = data.text || "";
+
+      console.log(`📄 Extracted text length: ${content.length} characters`);
+
+      console.log(`PDF processing completed for "${filename}"`);
 
       return {
-        content: data.text,
+        content: content,
         thumbnail: undefined, // PDFs don't have thumbnails by default
       };
     } catch (error) {
       console.error(`Failed to parse PDF "${filename}":`, error);
-      throw new Error(
-        `PDF processing failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      return {
+        content: "",
+        thumbnail: undefined,
+      };
     }
   }
 }

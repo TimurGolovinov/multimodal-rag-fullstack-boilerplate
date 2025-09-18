@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { authService } from "../services/authService";
 
@@ -29,29 +29,16 @@ export const useAuthChecker = (
   const isCheckingRef = useRef(false);
 
   /**
-   * Decode JWT token to get expiration time
-   */
-  const getTokenExpiration = (token: string): number | null => {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.exp * 1000; // Convert to milliseconds
-    } catch (error) {
-      console.error("Failed to decode token:", error);
-      return null;
-    }
-  };
-
-  /**
    * Check if token needs refresh
    */
-  const needsRefresh = (token: string): boolean => {
+  const needsRefresh = useCallback((): boolean => {
     return authService.needsRefresh(refreshThreshold / (60 * 1000)); // Convert to minutes
-  };
+  }, [refreshThreshold]);
 
   /**
    * Perform authentication check
    */
-  const performAuthCheck = async (): Promise<void> => {
+  const performAuthCheck = useCallback(async (): Promise<void> => {
     if (isCheckingRef.current) return;
 
     isCheckingRef.current = true;
@@ -69,7 +56,7 @@ export const useAuthChecker = (
       }
 
       // Check if token is expired or needs refresh
-      if (needsRefresh(accessToken)) {
+      if (needsRefresh()) {
         console.log("Token needs refresh, attempting refresh...");
 
         const refreshed = await refreshToken();
@@ -86,12 +73,12 @@ export const useAuthChecker = (
     } finally {
       isCheckingRef.current = false;
     }
-  };
+  }, [isAuthenticated, logout, refreshToken, needsRefresh]);
 
   /**
    * Start the authentication checker
    */
-  const startAuthChecker = (): void => {
+  const startAuthChecker = useCallback((): void => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
@@ -103,7 +90,7 @@ export const useAuthChecker = (
 
     // Set up periodic checking
     intervalRef.current = setInterval(performAuthCheck, checkInterval);
-  };
+  }, [enabled, checkInterval, performAuthCheck]);
 
   /**
    * Stop the authentication checker
@@ -127,7 +114,7 @@ export const useAuthChecker = (
     return () => {
       stopAuthChecker();
     };
-  }, [enabled, isAuthenticated]);
+  }, [enabled, isAuthenticated, startAuthChecker]);
 
   // Cleanup on unmount
   useEffect(() => {

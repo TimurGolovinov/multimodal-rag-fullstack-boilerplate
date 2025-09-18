@@ -14,11 +14,15 @@ RUN npm ci
 COPY . .
 
 # Set build-time environment variables for development
-ARG VITE_API_BASE=http://localhost
+ARG VITE_API_BASE=http://localhost:3000
 ENV VITE_API_BASE=$VITE_API_BASE
 
 # Expose Vite dev server port
 EXPOSE 5173
+
+# Add health check for development server
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5173/ || exit 1
 
 # Start development server with hot reload
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

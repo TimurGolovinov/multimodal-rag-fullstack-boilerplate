@@ -87,17 +87,6 @@ export class FileValidationService {
     "video/x-ms-wmv": [[0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11]], // WMV
     "video/3gpp": [[0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70]], // 3GP
     "video/ogg": [[0x4f, 0x67, 0x67, 0x53]], // OggS
-
-    // Archives
-    "application/zip": [
-      [0x50, 0x4b, 0x03, 0x04],
-      [0x50, 0x4b, 0x05, 0x06],
-      [0x50, 0x4b, 0x07, 0x08],
-    ], // ZIP
-    "application/x-rar-compressed": [
-      [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00],
-    ], // RAR
-    "application/x-7z-compressed": [[0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]], // 7Z
   };
 
   // Allowed file extensions as backup validation
@@ -142,10 +131,6 @@ export class FileValidationService {
     ".m4v",
     ".3gp",
     ".ogv",
-    // Archives
-    ".zip",
-    ".rar",
-    ".7z",
   ]);
 
   /**
@@ -257,6 +242,37 @@ export class FileValidationService {
     error?: string;
     detectedMimeType?: string;
   } {
+    // Special handling for text/plain files - they often don't have BOM
+    if (mimeType === "text/plain") {
+      // Check if it has a BOM first
+      const expectedMagicNumbers = this.MAGIC_NUMBERS[mimeType];
+      for (const magicPattern of expectedMagicNumbers) {
+        if (this.checkMagicNumber(buffer, magicPattern)) {
+          return { isValid: true };
+        }
+      }
+
+      // If no BOM, check if it's valid text content
+      if (this.isValidTextContent(buffer)) {
+        return { isValid: true };
+      }
+
+      // Try to detect the actual MIME type
+      const detectedType = this.detectMimeTypeByMagicNumbers(buffer);
+      if (detectedType) {
+        return {
+          isValid: false,
+          error: `File type mismatch: declared ${mimeType}, but file appears to be ${detectedType}`,
+          detectedMimeType: detectedType,
+        };
+      }
+
+      return {
+        isValid: false,
+        error: `File does not appear to be valid text content`,
+      };
+    }
+
     // Get expected magic numbers for the MIME type
     const expectedMagicNumbers = this.MAGIC_NUMBERS[mimeType];
 
@@ -398,5 +414,33 @@ export class FileValidationService {
    */
   public static isExtensionAllowed(extension: string): boolean {
     return this.ALLOWED_EXTENSIONS.has(extension.toLowerCase());
+  }
+
+  /**
+   * Check if buffer contains valid text content
+   * @param buffer - File buffer to check
+   * @returns True if content appears to be valid text
+   */
+  private static isValidTextContent(buffer: Buffer): boolean {
+    if (buffer.length === 0) {
+      return false;
+    }
+
+    // Check if the buffer contains only printable ASCII characters, tabs, newlines, and carriage returns
+    // This is a simple heuristic - in practice, you might want to be more sophisticated
+    for (let i = 0; i < buffer.length; i++) {
+      const byte = buffer[i];
+      // Allow printable ASCII (32-126), tab (9), newline (10), carriage return (13)
+      if (byte < 9 || (byte > 13 && byte < 32) || byte > 126) {
+        // Check for common non-ASCII but still text characters (extended ASCII and some Unicode)
+        // This is a basic check - for full Unicode support, you'd need more sophisticated parsing
+        if (byte < 128) {
+          return false; // Invalid ASCII character
+        }
+        // For bytes >= 128, we'll be more permissive as they could be UTF-8 encoded text
+      }
+    }
+
+    return true;
   }
 }

@@ -1,17 +1,17 @@
-# 🚀 RAG Application - Advanced Multimodal RAG with PostgreSQL & Docker
+# 🚀 Multimodal RAG Fullstack Boilerplate
 
-A production-ready Retrieval-Augmented Generation (RAG) application that supports multiple file types, built with Node.js, PostgreSQL, and Docker.
+A modern Retrieval-Augmented Generation (RAG) application with hybrid video processing, built with React, Node.js, PostgreSQL, and Docker.
 
 ## ✨ Features
 
 - **🔍 Multimodal Document Processing**: PDF, Word, Images, Audio, Video
+- **🎬 Hybrid Video Processing**: Client-side frame extraction + server-side AI analysis
 - **🗄️ PostgreSQL Database**: Robust data storage with proper indexing
 - **🐳 Docker Support**: Easy deployment and scaling
 - **📁 File Storage**: Organized file management with cleanup
-- **🔒 Security**: Rate limiting, CORS, security headers
+- **🔒 Security**: Rate limiting, CORS, security headers, file validation
 - **📊 Monitoring**: Health checks, logging, metrics
-- **🔄 Migration**: Seamless transition from JSON to database
-- **🌐 Production Ready**: Nginx, HTTPS, Let's Encrypt SSL, clustering
+- **🌐 Production Ready**: Nginx, HTTPS, clustering
 
 ## 🏗️ Architecture
 
@@ -44,22 +44,21 @@ A production-ready Retrieval-Augmented Generation (RAG) application that support
 
    ```bash
    git clone <your-repo>
-   cd rag-application
-   cp env.example .env
+   cd multimodal-rag-fullstack-boilerplate
+   cp server/env.example .env
    # Edit .env with your configuration
    ```
 
 2. **Start everything**:
 
    ```bash
-   chmod +x deploy-docker.sh
-   ./deploy-docker.sh start
+   docker-compose up -d
    ```
 
 3. **Access your app**:
-   - Frontend: http://localhost
-   - API: http://localhost/api
-   - Health: http://localhost/health
+   - Frontend: http://localhost:5173
+   - API: http://localhost:3000
+   - Health: http://localhost:3000/health
 
 ### Option 2: Local Development
 
@@ -84,7 +83,7 @@ A production-ready Retrieval-Augmented Generation (RAG) application that support
 3. **Configure environment**:
 
    ```bash
-   cd ..
+   cd server
    cp env.example .env
    # Edit .env with your database credentials
    ```
@@ -100,10 +99,11 @@ A production-ready Retrieval-Augmented Generation (RAG) application that support
 
    ```bash
    # Terminal 1: Start server
+   cd server
    npm run dev
 
    # Terminal 2: Start client
-   cd ../client
+   cd client
    npm run dev
    ```
 
@@ -116,9 +116,9 @@ A production-ready Retrieval-Augmented Generation (RAG) application that support
 - **`document_embeddings`**: Vector embeddings for search
 - **`file_storage`**: File tracking and cleanup
 
-### Migration from JSON
+### Database Migration
 
-If you have existing data in `data/documents.json`:
+The application includes automatic database migration on startup:
 
 ```bash
 cd server
@@ -127,36 +127,32 @@ npm run migrate
 
 This will:
 
-- ✅ Create backups of your data
-- ✅ Migrate documents to PostgreSQL
-- ✅ Organize files in new storage structure
-- ✅ Verify migration success
-- ✅ Clean up old files
+- ✅ Create database tables and indexes
+- ✅ Set up proper constraints and relationships
+- ✅ Initialize default data if needed
 
 ## 🐳 Docker Commands
 
 ```bash
 # Start all services
-./deploy-docker.sh start
+docker-compose up -d
 
 # Check status
-./deploy-docker.sh status
+docker-compose ps
 
 # View logs
-./deploy-docker.sh logs app
-./deploy-docker.sh logs postgres
+docker-compose logs app
+docker-compose logs postgres
+docker-compose logs client
 
 # Stop services
-./deploy-docker.sh stop
+docker-compose down
 
-# Update application
-./deploy-docker.sh update
+# Rebuild and restart
+docker-compose up -d --build
 
-# Backup database
-./deploy-docker.sh backup
-
-# Cleanup resources
-./deploy-docker.sh cleanup
+# View logs in real-time
+docker-compose logs -f app
 ```
 
 ## 🔧 Configuration
@@ -191,30 +187,37 @@ The `docker-compose.yml` includes:
 
 - **PostgreSQL**: Database with health checks
 - **Redis**: Caching and sessions
-- **App**: Node.js application
+- **App**: Node.js application with clustering
+- **Client**: React development server
 - **Nginx**: Reverse proxy
-- **Backup**: Automated database backups
+- **Certbot**: SSL certificate management (optional)
+- **Backup**: Automated database backups (optional)
 
 ## 📁 File Structure
 
 ```
-rag-application/
+multimodal-rag-fullstack-boilerplate/
 ├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── services/       # Client-side services
+│   │   ├── hooks/          # Custom React hooks
+│   │   └── types/          # TypeScript types
+│   └── package.json        # Client dependencies
 ├── server/                 # Node.js backend
 │   ├── src/
 │   │   ├── controllers/    # API controllers
 │   │   ├── services/       # Business logic
 │   │   ├── database/       # Database layer
-│   │   │   ├── config.ts   # Database connection
-│   │   │   ├── schema.sql  # Database schema
-│   │   │   └── migration/  # Migration scripts
+│   │   ├── middleware/     # Express middleware
+│   │   ├── routes/         # API routes
 │   │   └── types/          # TypeScript types
+│   ├── tests/              # Test files
 │   ├── Dockerfile          # Docker configuration
-│   └── package.json        # Dependencies
+│   └── package.json        # Server dependencies
 ├── nginx/                  # Nginx configuration
 ├── docker-compose.yml      # Docker services
-├── deploy-docker.sh        # Deployment script
-└── env.example            # Environment template
+└── server/env.example      # Environment template
 ```
 
 ## 🔒 Security Features
@@ -222,8 +225,9 @@ rag-application/
 - **Rate Limiting**: API and upload endpoints
 - **CORS Protection**: Domain restrictions
 - **Security Headers**: XSS, CSRF protection
-- **Input Validation**: File type and size limits
-- **Authentication**: API key validation (configurable)
+- **File Validation**: MIME type, file signature, and content validation
+- **Authentication**: JWT-based authentication with refresh tokens
+- **Input Sanitization**: XSS and injection attack prevention
 
 ## 📊 Monitoring & Health
 
@@ -251,16 +255,16 @@ rag-application/
 
    ```bash
    git clone <your-repo>
-   cd rag-application
-   cp env.example .env
+   cd multimodal-rag-fullstack-boilerplate
+   cp server/env.example .env
    # Edit .env with production values
-   ./deploy-docker.sh start
+   docker-compose up -d
    ```
 
 4. **Configure domain**:
    - Point DNS to EC2 public IP
    - Update `ALLOWED_DOMAINS` in `.env`
-   - Restart services: `./deploy-docker.sh restart`
+   - Restart services: `docker-compose restart`
 
 ### SSL Setup
 
@@ -282,9 +286,20 @@ rag-application/
 1. **Make changes** to source code
 2. **Test locally** with `npm run dev`
 3. **Build and deploy**:
+
    ```bash
-   ./deploy-docker.sh update
+   # Full build with tests (production)
+   docker-compose up -d --build
+
+   # Fast build without tests (development)
+   docker-compose up -d --build --build-arg BUILD_COMMAND=build:fast
    ```
+
+### Build Commands
+
+- **`npm run build`**: Full build with tests (used in CI/CD)
+- **`npm run build:fast`**: Fast build without tests (used in development)
+- **`npm run test:ci`**: Run tests in CI mode (no watch, with coverage)
 
 ## 🧪 Testing
 
@@ -311,15 +326,26 @@ npm run lint:fix
 - `DELETE /api/documents/:id` - Delete document
 - `GET /api/documents/search?q=query` - Search documents
 
+### Video Processing Endpoints
+
+- `POST /api/video/process-frames` - Process video frames only
+- `POST /api/video/process-hybrid` - Process video with frames and audio
+
 ### Chat Endpoints
 
 - `POST /api/chat` - Send chat message
 - `GET /api/chat/history` - Get chat history
 
+### Authentication Endpoints
+
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/refresh` - Refresh token
+- `POST /api/auth/logout` - User logout
+
 ### Health & Monitoring
 
 - `GET /health` - Application health status
-- `GET /metrics` - Performance metrics
 
 ## 🐛 Troubleshooting
 
@@ -338,7 +364,7 @@ npm run lint:fix
    - Ensure proper MIME types
 
 3. **Docker services won't start**:
-   - Check logs: `./deploy-docker.sh logs`
+   - Check logs: `docker-compose logs`
    - Verify `.env` configuration
    - Check port conflicts
 
@@ -346,16 +372,16 @@ npm run lint:fix
 
 ```bash
 # View application logs
-./deploy-docker.sh logs app
+docker-compose logs app
 
 # View database logs
-./deploy-docker.sh logs postgres
+docker-compose logs postgres
 
 # Check service status
-./deploy-docker.sh status
+docker-compose ps
 
 # Access database directly
-docker compose exec postgres psql -U rag_user -d rag_app
+docker-compose exec postgres psql -U rag_user -d rag_app
 ```
 
 ## 📄 License

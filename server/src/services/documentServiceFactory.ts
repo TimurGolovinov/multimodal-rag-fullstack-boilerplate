@@ -2,7 +2,6 @@ import { DocumentService, DocumentServiceConfig } from "./documentService";
 import {
   ImageProcessorAdapter,
   AudioProcessorAdapter,
-  VideoProcessorAdapter,
   PdfProcessorAdapter,
   WordProcessorAdapter,
   TextProcessorAdapter,
@@ -16,7 +15,6 @@ export class DocumentServiceFactory {
     return new DocumentService({
       imageProcessor: new ImageProcessorAdapter(),
       audioProcessor: new AudioProcessorAdapter(),
-      videoProcessor: new VideoProcessorAdapter(),
       pdfProcessor: new PdfProcessorAdapter(),
       wordProcessor: new WordProcessorAdapter(),
       textProcessor: new TextProcessorAdapter(),
@@ -35,13 +33,12 @@ export class DocumentServiceFactory {
   }
 
   /**
-   * Creates a DocumentService with only media processors (Image, Audio, Video)
+   * Creates a DocumentService with only media processors (Image, Audio)
    */
   static createMediaOnly(): DocumentService {
     return new DocumentService({
       imageProcessor: new ImageProcessorAdapter(),
       audioProcessor: new AudioProcessorAdapter(),
-      videoProcessor: new VideoProcessorAdapter(),
     });
   }
 

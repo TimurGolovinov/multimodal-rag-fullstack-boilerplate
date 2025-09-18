@@ -14,6 +14,8 @@ import { createDocumentRoutes } from "./routes/documentRoutes";
 import { createChatRoutes } from "./routes/chatRoutes";
 import { createAuthRoutes } from "./routes/authRoutes";
 import { createUserRoutes } from "./routes/userRoutes";
+import { createVideoRoutes } from "./routes/videoRoutes";
+import { VideoController } from "./controllers/videoController";
 import {
   enforceHTTPS,
   httpsHeaders,
@@ -96,8 +98,9 @@ async function createServer() {
 
   // Initialize services and routes
   TransactionService.initialize();
-  const { documentController, chatController } = await initializeServices();
-  setupRoutes(app, documentController, chatController);
+  const { documentController, chatController, videoController } =
+    await initializeServices();
+  setupRoutes(app, documentController, chatController, videoController);
 
   // Create HTTP server
   const server = createHttpServer(app);
@@ -375,14 +378,16 @@ async function initializeServices() {
 
   const documentController = new DocumentController(globalDocumentService);
   const chatController = new ChatController(globalChatService);
+  const videoController = new VideoController(globalDocumentService);
 
-  return { documentController, chatController };
+  return { documentController, chatController, videoController };
 }
 
 function setupRoutes(
   app: express.Application,
   documentController: DocumentController,
-  chatController: ChatController
+  chatController: ChatController,
+  videoController: VideoController
 ) {
   // Initialize auth middleware with database pool
   const { dbConnection } = require("./database/config");
@@ -451,6 +456,7 @@ function setupRoutes(
   );
   app.use("/api/documents", createDocumentRoutes(documentController));
   app.use("/api/chat", createChatRoutes(chatController));
+  app.use("/api/video", createVideoRoutes(videoController));
 
   // Root endpoint
   app.get("/", (req, res) => {

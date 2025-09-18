@@ -1,4 +1,5 @@
-import { AuthService } from "../../src/services/authService";
+import { describe, it, expect, jest } from "@jest/globals";
+import { AuthService } from "../src/services/authService";
 
 // Mock JWT
 jest.mock("jsonwebtoken", () => ({
@@ -14,7 +15,7 @@ jest.mock("../../src/database/config", () => ({
       query: jest.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
       connect: jest.fn().mockResolvedValue(undefined),
       end: jest.fn().mockResolvedValue(undefined),
-    }),
+    } as any),
   },
 }));
 

@@ -1,0 +1,493 @@
+/* Enhanced Video Processor Styles */
+
+.enhanced-video-processor {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.enhanced-video-processor.unsupported {
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+}
+
+.processor-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.processor-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1f2937;
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+
+.processor-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+/* File Drop Zone */
+.file-drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #f9fafb;
+}
+
+.file-drop-zone:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.file-drop-zone.drag-active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  transform: scale(1.02);
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.drop-zone-icon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+.drop-zone-content h3 {
+  margin: 0;
+  color: #374151;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.drop-zone-content p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.supported-formats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.supported-formats span {
+  background: #e5e7eb;
+  color: #374151;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Video Processing Container */
+.video-processing-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.file-details h3 {
+  margin: 0 0 0.25rem 0;
+  color: #1f2937;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.file-details p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.change-file-btn {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.change-file-btn:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.change-file-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Processing Options */
+.processing-options {
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.processing-options h4 {
+  margin: 0 0 1rem 0;
+  color: #1e293b;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.option-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.option-item label {
+  color: #475569;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.option-item span {
+  color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.process-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.process-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Processing Status */
+.processing-status {
+  padding: 1.5rem;
+  background: #f0f9ff;
+  border-radius: 8px;
+  border: 1px solid #bae6fd;
+}
+
+.progress-container {
+  margin-bottom: 1rem;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stage-icon {
+  font-size: 1.5rem;
+}
+
+.stage-text {
+  color: #1e40af;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e0e7ff;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progress-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progress-percentage {
+  color: #1e40af;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.current-step {
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.cancel-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: #dc2626;
+}
+
+/* Error Status */
+.error-status {
+  padding: 1.5rem;
+  background: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+.error-message {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.error-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.error-message h4 {
+  margin: 0 0 0.5rem 0;
+  color: #dc2626;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.error-message p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 0.875rem;
+}
+
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.retry-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.retry-btn:hover {
+  background: #2563eb;
+}
+
+.reset-btn {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.reset-btn:hover {
+  background: #4b5563;
+}
+
+/* Success Status */
+.success-status {
+  padding: 1.5rem;
+  background: #f0fdf4;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+}
+
+.success-message {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.success-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.success-message h4 {
+  margin: 0 0 1rem 0;
+  color: #059669;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.result-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.result-summary p {
+  margin: 0;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  color: #065f46;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.success-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.process-another-btn {
+  background: #059669;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.process-another-btn:hover {
+  background: #047857;
+}
+
+/* Unsupported Browser */
+.unsupported-message {
+  text-align: center;
+  padding: 2rem;
+}
+
+.unsupported-message h3 {
+  margin: 0 0 1rem 0;
+  color: #92400e;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.unsupported-message p {
+  margin: 0 0 1.5rem 0;
+  color: #a16207;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.browser-requirements {
+  text-align: left;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.browser-requirements h4 {
+  margin: 0 0 0.75rem 0;
+  color: #92400e;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.browser-requirements ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #a16207;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.browser-requirements li {
+  margin-bottom: 0.25rem;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .enhanced-video-processor {
+    padding: 1rem;
+  }
+
+  .file-info {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .error-actions,
+  .success-actions {
+    flex-direction: column;
+  }
+
+  .result-summary {
+    grid-template-columns: 1fr;
+  }
+}

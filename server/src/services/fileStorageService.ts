@@ -92,7 +92,7 @@ export class FileStorageService {
   ): Promise<StoredFile> {
     try {
       // Validate file
-      this.validateFile(file);
+      await this.validateFile(file);
 
       // Generate unique filename
       const fileId = uuidv4();
@@ -327,18 +327,17 @@ export class FileStorageService {
   /**
    * Validate file before storage using magic number checking
    */
-  private validateFile(file: Express.Multer.File): void {
+  private async validateFile(file: Express.Multer.File): Promise<void> {
     if (!file) {
       throw new Error("No file provided");
     }
 
     // Use the new file validation service
-    const validation = FileValidationService.validateFile(
-      file,
-      this.config.allowedMimeTypes
-    );
+    const validation = await FileValidationService.validateFile(file, {
+      allowedMimeTypes: this.config.allowedMimeTypes,
+    });
     if (!validation.isValid) {
-      throw new Error(validation.error || "File validation failed");
+      throw new Error(validation.errors.join(", ") || "File validation failed");
     }
 
     // Additional size check (redundant but kept for clarity)

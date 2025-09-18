@@ -8,9 +8,4 @@ export type Doc = {
   thumbnail?: string | null;
 };
 
-export type ChatResponse = {
-  success: boolean;
-  message: string;
-  sources: Doc[];
-  messageId?: string;
-};
+// Removed unused ChatResponse type

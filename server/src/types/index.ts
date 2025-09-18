@@ -44,22 +44,9 @@ export interface AudioAnalysis {
   confidence: number;
 }
 
-export interface VideoAnalysis {
-  visualSummary: string;
-  audioTranscript: string;
-  keyMoments: string[];
-  duration: number;
-  frameCount: number;
-  combinedContent: string;
-  confidence: number;
-  thumbnail?: string | null;
-}
+// Removed unused VideoAnalysis interface
 
-export interface ProcessingProgress {
-  stage: "extracting" | "analyzing" | "synthesizing";
-  progress: number;
-  message: string;
-}
+// Removed unused ProcessingProgress interface
 
 export interface ChatMessage {
   id: string;
@@ -102,12 +89,7 @@ export interface DocumentStats {
   byStatus: Record<string, number>;
 }
 
-export interface SearchResponse {
-  documents: Document[];
-  query: string;
-  total: number;
-  executionTime: number;
-}
+// Removed unused SearchResponse interface
 
 // Database-specific types
 export interface DatabaseDocument {

@@ -47,7 +47,7 @@ describe("TransactionService", () => {
       expect(result.success).toBe(true);
       expect(result.data).toEqual(mockResult);
       expect(mockClient.query).toHaveBeenCalledWith(
-        "BEGIN ISOLATION LEVEL READ_COMMITTED"
+        "BEGIN ISOLATION LEVEL READ COMMITTED"
       );
       expect(mockClient.query).toHaveBeenCalledWith("COMMIT");
       expect(mockClient.release).toHaveBeenCalled();
@@ -62,7 +62,7 @@ describe("TransactionService", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("Database error");
       expect(mockClient.query).toHaveBeenCalledWith(
-        "BEGIN ISOLATION LEVEL READ_COMMITTED"
+        "BEGIN ISOLATION LEVEL READ COMMITTED"
       );
       expect(mockClient.query).toHaveBeenCalledWith("ROLLBACK");
       expect(mockClient.release).toHaveBeenCalled();
@@ -88,7 +88,7 @@ describe("TransactionService", () => {
       });
 
       expect(mockClient.query).toHaveBeenCalledWith(
-        "BEGIN ISOLATION LEVEL READ_COMMITTED READ ONLY"
+        "BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY"
       );
     });
 
@@ -100,7 +100,7 @@ describe("TransactionService", () => {
       });
 
       expect(mockClient.query).toHaveBeenCalledWith(
-        "BEGIN ISOLATION LEVEL READ_COMMITTED DEFERRABLE"
+        "BEGIN ISOLATION LEVEL READ COMMITTED DEFERRABLE"
       );
     });
   });
@@ -174,7 +174,7 @@ describe("TransactionService", () => {
       await TransactionService.executeReadOnlyTransaction(operation);
 
       expect(mockClient.query).toHaveBeenCalledWith(
-        "BEGIN ISOLATION LEVEL READ_COMMITTED READ ONLY"
+        "BEGIN ISOLATION LEVEL READ COMMITTED READ ONLY"
       );
     });
   });

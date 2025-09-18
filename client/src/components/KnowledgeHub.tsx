@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Doc } from "../types";
 import { API_BASE } from "../constants";
 import { useAuth } from "../contexts/AuthContext";
+import { enhancedVideoProcessor } from "../services/enhancedVideoProcessor";
 
 export function KnowledgeHub() {
   const { isAuthenticated } = useAuth();
@@ -99,71 +100,160 @@ export function KnowledgeHub() {
         message: "Starting upload...",
       });
 
-      try {
-        // Simulate progress for video files
-        if (file.type.startsWith("video/")) {
-          setUploadProgress({
-            stage: "extracting",
-            progress: 10,
-            message: "Processing video...",
-          });
+      let retryCount = 0;
+      const maxRetries = 3;
 
-          // Simulate frame extraction progress
-          for (let i = 1; i <= 5; i++) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+      const attemptUpload = async (): Promise<void> => {
+        try {
+          // Handle video files with client-side processing
+          if (file.type.startsWith("video/")) {
             setUploadProgress({
               stage: "extracting",
-              progress: 10 + i * 8,
-              message: `Extracting frames... ${i}/5`,
+              progress: 10,
+              message:
+                "Extracting frames from video. \n This may take a while...",
             });
-          }
 
-          setUploadProgress({
-            stage: "analyzing",
-            progress: 50,
-            message: "Analyzing with AI...",
-          });
+            // Process video with hybrid processor (audio + visual)
+            const videoResult = await enhancedVideoProcessor.processVideo(file);
 
-          // Simulate AI analysis
-          for (let i = 1; i <= 3; i++) {
-            await new Promise((resolve) => setTimeout(resolve, 800));
             setUploadProgress({
               stage: "analyzing",
-              progress: 50 + i * 15,
-              message: `AI analysis... ${i}/3`,
+              progress: 50,
+              message: `Analyzing ${videoResult.frameCount} frames and ${videoResult.audioSegmentCount} audio segments with AI...`,
             });
+
+            // Send hybrid content to server for AI analysis
+            const hybridFormData =
+              enhancedVideoProcessor.prepareForUpload(videoResult);
+            hybridFormData.append("originalVideoName", file.name);
+
+            const videoResponse = await fetch(`${API_BASE}/api/video/process`, {
+              method: "POST",
+              headers: getAuthHeaders(),
+              credentials: "include",
+              body: hybridFormData,
+            });
+
+            if (!videoResponse.ok) {
+              const errorText = await videoResponse.text();
+              let errorMessage = `Video processing failed: ${videoResponse.status}`;
+
+              try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.message || errorMessage;
+              } catch {
+                // Use default error message if parsing fails
+              }
+
+              throw new Error(errorMessage);
+            }
+
+            const videoData = await videoResponse.json();
+
+            setUploadProgress({
+              stage: "completed",
+              progress: 100,
+              message: `Video processed successfully! ${videoData.frameCount} frames and ${videoData.audioSegmentCount} audio segments analyzed.`,
+            });
+
+            // Reload documents to show the new video analysis
+            await load();
+            return;
+          }
+
+          // Handle non-video files
+          const response = await fetch(`${API_BASE}/api/documents/upload`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            credentials: "include",
+            body: form,
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = `Upload failed: ${response.status}`;
+
+            try {
+              const errorData = JSON.parse(errorText);
+              errorMessage = errorData.message || errorMessage;
+            } catch {
+              // Use default error message if parsing fails
+            }
+
+            throw new Error(errorMessage);
           }
 
           setUploadProgress({
-            stage: "synthesizing",
-            progress: 95,
-            message: "Finalizing...",
+            stage: "complete",
+            progress: 100,
+            message: "Upload complete!",
+          });
+
+          await load();
+        } catch (error) {
+          console.error("Upload error:", error);
+
+          // Check if this is a retryable error
+          const isRetryableError =
+            error instanceof Error &&
+            (error.message.includes("network") ||
+              error.message.includes("timeout") ||
+              error.message.includes("500") ||
+              error.message.includes("502") ||
+              error.message.includes("503") ||
+              error.message.includes("504"));
+
+          if (isRetryableError && retryCount < maxRetries) {
+            retryCount++;
+            setUploadProgress({
+              stage: "retrying",
+              progress: 0,
+              message: `Upload failed, retrying... (${retryCount}/${maxRetries})`,
+            });
+
+            // Wait before retry (exponential backoff)
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.pow(2, retryCount) * 1000)
+            );
+            return attemptUpload();
+          }
+
+          // Determine user-friendly error message
+          let userMessage = "Upload failed";
+          if (error instanceof Error) {
+            if (error.message.includes("413")) {
+              userMessage = "File too large. Please choose a smaller file.";
+            } else if (error.message.includes("415")) {
+              userMessage =
+                "Unsupported file type. Please choose a supported format.";
+            } else if (error.message.includes("401")) {
+              userMessage =
+                "Authentication expired. Please refresh the page and try again.";
+            } else if (
+              error.message.includes("network") ||
+              error.message.includes("fetch")
+            ) {
+              userMessage =
+                "Network error. Please check your connection and try again.";
+            } else {
+              userMessage = error.message;
+            }
+          }
+
+          setUploadProgress({
+            stage: "error",
+            progress: 0,
+            message: userMessage,
           });
         }
+      };
 
-        await fetch(`${API_BASE}/api/documents/upload`, {
-          method: "POST",
-          headers: getAuthHeaders(),
-          credentials: "include",
-          body: form,
-        });
-
-        setUploadProgress({
-          stage: "complete",
-          progress: 100,
-          message: "Upload complete!",
-        });
-
-        await load();
-      } catch (error) {
-        setUploadProgress({
-          stage: "error",
-          progress: 0,
-          message: `Upload failed: ${error}`,
-        });
+      try {
+        await attemptUpload();
       } finally {
         setUploading(false);
-        setTimeout(() => setUploadProgress(null), 2000);
+        setTimeout(() => setUploadProgress(null), 5000); // Show error for 5 seconds
         if (fileRef.current) fileRef.current.value = "";
       }
     },
@@ -393,8 +483,8 @@ export function KnowledgeHub() {
         {docs.map((d) => (
           <div key={d.id} className="document-item">
             <div className="document-info">
-              {/* Thumbnail for videos and images */}
-              {(d.type === "video" || d.type === "image") && d.thumbnail ? (
+              {/* Thumbnail for images */}
+              {d.type === "image" && d.thumbnail ? (
                 <div className="document-thumbnail">
                   <img
                     src={`data:image/png;base64,${d.thumbnail}`}

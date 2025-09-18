@@ -6,7 +6,7 @@ import { z, ZodSchema } from "zod";
  * @param schema - Zod schema to validate against
  * @param target - Which part of the request to validate ('body', 'query', 'params')
  */
-export const validate = (
+const validate = (
   schema: ZodSchema,
   target: "body" | "query" | "params" = "body"
 ) => {

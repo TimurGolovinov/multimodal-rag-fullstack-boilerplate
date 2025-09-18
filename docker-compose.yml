@@ -51,6 +51,7 @@ services:
       dockerfile: Dockerfile.dev
       args:
         VITE_API_BASE: ${VITE_API_BASE:-http://localhost:3000}
+        BUILD_COMMAND: "build:fast"
     container_name: rag-client
     ports:
       - "5173:5173" # Expose Vite dev server port
@@ -94,6 +95,8 @@ services:
       context: ./server
       dockerfile: Dockerfile
       target: development
+      args:
+        BUILD_COMMAND: "build:fast"
     container_name: rag-app
     environment:
       NODE_ENV: development

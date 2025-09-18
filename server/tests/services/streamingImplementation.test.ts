@@ -90,7 +90,7 @@ describe("Streaming Implementation Tests", () => {
         timestamp: expect.any(String),
       });
 
-      expect(onComplete).toHaveBeenCalledWith("Hello world");
+      expect(onComplete).toHaveBeenCalledWith("Hello world!");
       expect(onError).not.toHaveBeenCalled();
     });
 
@@ -151,7 +151,7 @@ describe("Streaming Implementation Tests", () => {
         timestamp: expect.any(String),
       });
 
-      expect(onComplete).toHaveBeenCalledWith("Hello world");
+      expect(onComplete).toHaveBeenCalledWith("Hello world!");
     });
 
     it("should handle streaming errors", async () => {

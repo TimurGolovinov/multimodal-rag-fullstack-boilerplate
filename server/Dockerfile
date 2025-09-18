@@ -6,7 +6,6 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    ffmpeg \
     curl \
     && rm -rf /var/cache/apk/*
 
@@ -29,7 +28,7 @@ RUN npm ci --legacy-peer-deps
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN npm run build:fast
 
 # Expose port
 EXPOSE 3000
@@ -47,7 +46,7 @@ RUN npm ci --legacy-peer-deps
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN npm run build:fast
 
 # Production stage
 FROM node:18-alpine AS production
@@ -58,7 +57,6 @@ RUN addgroup -g 1001 -S nodejs && \
 
 # Install production dependencies only
 RUN apk add --no-cache \
-    ffmpeg \
     curl \
     && rm -rf /var/cache/apk/*
 

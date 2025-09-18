@@ -39,7 +39,6 @@ describe("DocumentServiceFactory", () => {
       expect(DocumentService).toHaveBeenCalledWith({
         imageProcessor: expect.any(ImageProcessorAdapter),
         audioProcessor: expect.any(AudioProcessorAdapter),
-        videoProcessor: expect.any(VideoProcessorAdapter),
         pdfProcessor: expect.any(PdfProcessorAdapter),
         wordProcessor: expect.any(WordProcessorAdapter),
         textProcessor: expect.any(TextProcessorAdapter),
@@ -52,7 +51,6 @@ describe("DocumentServiceFactory", () => {
 
       expect(ImageProcessorAdapter).toHaveBeenCalledTimes(1);
       expect(AudioProcessorAdapter).toHaveBeenCalledTimes(1);
-      expect(VideoProcessorAdapter).toHaveBeenCalledTimes(1);
       expect(PdfProcessorAdapter).toHaveBeenCalledTimes(1);
       expect(WordProcessorAdapter).toHaveBeenCalledTimes(1);
       expect(TextProcessorAdapter).toHaveBeenCalledTimes(1);
@@ -264,4 +262,3 @@ describe("DocumentServiceFactory", () => {
     });
   });
 });
-

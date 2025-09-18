@@ -899,8 +899,9 @@ body {
 }
 
 .progress-message {
+  padding: 0rem 1rem;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .progress-bar {

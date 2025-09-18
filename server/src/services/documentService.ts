@@ -14,7 +14,6 @@ export interface DocumentProcessor {
 export interface DocumentServiceConfig {
   imageProcessor?: DocumentProcessor;
   audioProcessor?: DocumentProcessor;
-  videoProcessor?: DocumentProcessor;
   pdfProcessor?: DocumentProcessor;
   wordProcessor?: DocumentProcessor;
   textProcessor?: DocumentProcessor;
@@ -37,7 +36,6 @@ export class DocumentService {
     // Add configured processors
     if (config?.imageProcessor) this.processors.push(config.imageProcessor);
     if (config?.audioProcessor) this.processors.push(config.audioProcessor);
-    if (config?.videoProcessor) this.processors.push(config.videoProcessor);
     if (config?.pdfProcessor) this.processors.push(config.pdfProcessor);
     if (config?.wordProcessor) this.processors.push(config.wordProcessor);
     if (config?.textProcessor) this.processors.push(config.textProcessor);
@@ -529,6 +527,24 @@ export class DocumentService {
   }
 
   /**
+   * Update document type
+   */
+  async updateDocumentType(documentId: string, newType: DocumentType) {
+    try {
+      await this.ensureDatabaseService();
+      if (!this.dbService) {
+        throw new Error("Database service not available");
+      }
+
+      await this.dbService.updateDocumentType(documentId, newType);
+      console.log(`✅ Updated document ${documentId} type to ${newType}`);
+    } catch (error) {
+      console.error(`❌ Failed to update document type:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Get vector store status and statistics
    */
   /**
@@ -725,7 +741,7 @@ export class DocumentService {
     }
 
     // All other types are binary and should use original buffer
-    // This includes: pdf, image, audio, video, word (office docs)
+    // This includes: pdf, image, audio, word (office docs)
     return true;
   }
 

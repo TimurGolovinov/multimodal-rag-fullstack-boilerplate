@@ -399,7 +399,9 @@ export class DocumentDatabaseService {
   /**
    * Get user documents with external IDs for vector search optimization
    */
-  async getUserDocumentsWithExternalIds(userId: string): Promise<{ id: string; externalId: string }[]> {
+  async getUserDocumentsWithExternalIds(
+    userId: string
+  ): Promise<{ id: string; externalId: string }[]> {
     const client = await this.getPool().connect();
 
     try {
@@ -720,6 +722,36 @@ export class DocumentDatabaseService {
     } catch (error) {
       throw new Error(
         `Failed to clear chat history: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Update document type
+   */
+  async updateDocumentType(
+    documentId: string,
+    newType: string
+  ): Promise<boolean> {
+    const client = await this.getPool().connect();
+
+    try {
+      const query = `
+        UPDATE documents 
+        SET document_type = $1, updated_at = NOW()
+        WHERE id = $2
+      `;
+      const values = [newType, documentId];
+
+      const result = await client.query(query, values);
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      throw new Error(
+        `Failed to update document type: ${
           error instanceof Error ? error.message : "Unknown error"
         }`
       );

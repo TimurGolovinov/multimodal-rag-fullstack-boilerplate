@@ -87,42 +87,6 @@ Provide a thorough, searchable description that captures all the important visua
     }
   }
 
-  /**
-   * Get a comprehensive text representation of the image for vector storage
-   */
-  async getImageTextRepresentation(
-    imageBuffer: Buffer,
-    filename: string
-  ): Promise<string> {
-    try {
-      const analysis = await this.analyzeImage(imageBuffer, filename);
-
-      // Create a comprehensive text representation
-      let textRepresentation = `Image Analysis for ${filename}:\n\n`;
-      textRepresentation += `Description: ${analysis.description}\n\n`;
-
-      if (analysis.extractedText) {
-        textRepresentation += `Extracted Text: ${analysis.extractedText}\n\n`;
-      }
-
-      if (analysis.chartData) {
-        textRepresentation += `Chart/Data Information: ${JSON.stringify(
-          analysis.chartData,
-          null,
-          2
-        )}\n\n`;
-      }
-
-      textRepresentation += `Analysis Confidence: ${analysis.confidence}`;
-
-      return textRepresentation;
-    } catch (error) {
-      console.error("Error getting image text representation:", error);
-      // Fallback to basic filename description
-      return `Image file: ${filename} - Unable to analyze content`;
-    }
-  }
-
   private parseAnalysisResponse(response: string): {
     description: string;
     extractedText?: string;
@@ -176,26 +140,23 @@ Provide a thorough, searchable description that captures all the important visua
     try {
       const analysis = await this.analyzeImage(imageBuffer, filename);
 
-      // Combine description and extracted text for better search
+      // Create clean, searchable content without verbose structure
+      // This content will be used for vectorization, so it should be natural and searchable
       let textContent = analysis.description;
 
       if (analysis.extractedText) {
-        textContent += `\n\nExtracted Text:\n${analysis.extractedText}`;
+        textContent += `\n\n${analysis.extractedText}`;
       }
 
       if (analysis.chartData) {
-        textContent += `\n\nChart Data:\n${JSON.stringify(
-          analysis.chartData,
-          null,
-          2
-        )}`;
+        textContent += `\n\n${JSON.stringify(analysis.chartData, null, 2)}`;
       }
 
       // Generate thumbnail (resize image to 48x48 for UI)
       const thumbnail = await this.generateThumbnail(imageBuffer);
 
       return {
-        content: textContent,
+        content: textContent.trim(),
         thumbnail: thumbnail.toString("base64"),
       };
     } catch (error) {

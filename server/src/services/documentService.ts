@@ -182,34 +182,69 @@ export class DocumentService {
       try {
         await this.ensureVectorStore();
         if (this.vectorStore && content.trim().length > 0) {
-          // For binary files (PDFs, images, audio, video, office docs, archives),
-          // pass the original file buffer to preserve the full file
-          // For text files, use the extracted text content
-          const isBinaryFile = this.isBinaryFileType(
-            documentType,
-            file.mimetype
-          );
-          const vectorContent = isBinaryFile ? file.buffer : content;
+          // Handle different file types for vector store
+          let vectorContent: string | Buffer;
+          let vectorMetadata: any;
 
-          console.log(`🔍 Vector store content decision:`);
-          console.log(`  - Is binary file: ${isBinaryFile}`);
-          console.log(
-            `  - Using: ${isBinaryFile ? "original buffer" : "extracted text"}`
-          );
-          console.log(
-            `  - Vector content size: ${vectorContent.length} ${
-              isBinaryFile ? "bytes" : "characters"
-            }`
-          );
+          if (documentType === "image") {
+            // For images, create a .txt file with the extracted text content
+            console.log(
+              `🖼️ Processing image for vector store: ${document.filename}`
+            );
 
-          await this.vectorStore.addDocument(document.id, vectorContent, {
-            filename: document.filename,
-            type: documentType,
-            uploadedAt: document.uploadedAt.toISOString(),
-            size: document.fileSize || file.size,
-            mimetype: document.mimeType || file.mimetype,
-            userId: userId,
-          });
+            // Create a .txt filename for the vector store
+            const txtFilename = document.filename.replace(/\.[^/.]+$/, ".txt");
+
+            vectorContent = content; // Use the extracted text content
+            vectorMetadata = {
+              filename: txtFilename,
+              type: "text", // Mark as text for vector store
+              uploadedAt: document.uploadedAt.toISOString(),
+              size: content.length, // Text content size
+              mimetype: "text/plain", // Force text/plain for vector store
+              userId: userId,
+              originalImage: document.filename, // Track original image
+            };
+
+            console.log(
+              `📝 Created text file for vector store: ${txtFilename}`
+            );
+            console.log(`  - Text content size: ${content.length} characters`);
+          } else {
+            // For other files, use existing logic
+            const isBinaryFile = this.isBinaryFileType(
+              documentType,
+              file.mimetype
+            );
+            vectorContent = isBinaryFile ? file.buffer : content;
+            vectorMetadata = {
+              filename: document.filename,
+              type: documentType,
+              uploadedAt: document.uploadedAt.toISOString(),
+              size: document.fileSize || file.size,
+              mimetype: document.mimeType || file.mimetype,
+              userId: userId,
+            };
+
+            console.log(`🔍 Vector store content decision:`);
+            console.log(`  - Is binary file: ${isBinaryFile}`);
+            console.log(
+              `  - Using: ${
+                isBinaryFile ? "original buffer" : "extracted text"
+              }`
+            );
+            console.log(
+              `  - Vector content size: ${vectorContent.length} ${
+                isBinaryFile ? "bytes" : "characters"
+              }`
+            );
+          }
+
+          await this.vectorStore.addDocument(
+            document.id,
+            vectorContent,
+            vectorMetadata
+          );
 
           // Get the external ID from the vector store
           // We need to find the file ID that was created

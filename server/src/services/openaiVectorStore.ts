@@ -110,26 +110,13 @@ export class OpenAIVectorStore {
       }
 
       // Create a file first, then add to vector store (simpler approach)
-      // For media files (images, videos, audio), we need to use a .txt extension since we're storing text content
-      const filename =
-        metadata.mimetype?.startsWith("image/") ||
-        metadata.mimetype?.startsWith("video/") ||
-        metadata.mimetype?.startsWith("audio/")
-          ? `${metadata.filename.replace(/\.[^/.]+$/, "")}.txt`
-          : metadata.filename;
+      // Use the filename provided in metadata (may be converted to .txt for images)
+      const filename = metadata.filename;
 
-      if (filename !== metadata.filename) {
-        console.log(
-          `Converting media file "${metadata.filename}" to text file "${filename}" for OpenAI Files API`
-        );
-      } else {
-        console.log(
-          `Using original filename "${filename}" for OpenAI Files API`
-        );
-      }
+      console.log(`Using filename "${filename}" for OpenAI Files API`);
 
       // Create a proper File object using Node.js File constructor
-      // Use the correct MIME type for better processing
+      // Use the MIME type provided in metadata
       const mimeType = metadata.mimetype || "text/plain";
 
       // Handle both string content and Buffer content

@@ -1,5 +1,5 @@
-# Multi-stage build for React Client
-FROM node:20-alpine AS build
+# Unified Dockerfile for React Client - Development and Production
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
@@ -15,19 +15,51 @@ COPY . .
 
 # Set build-time environment variables
 ARG VITE_API_BASE=http://localhost:3000
+ARG NODE_ENV=development
 ENV VITE_API_BASE=$VITE_API_BASE
+ENV NODE_ENV=$NODE_ENV
+
+# Development stage
+FROM node:20-alpine AS development
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+ARG VITE_API_BASE=http://localhost:3000
+ENV VITE_API_BASE=$VITE_API_BASE
+ENV NODE_ENV=development
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Add health check for development server
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:5173/ || exit 1
+
+# Start development server with hot reload
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+# Production build stage
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+ARG VITE_API_BASE=http://localhost:3000
+ENV VITE_API_BASE=$VITE_API_BASE
+ENV NODE_ENV=production
 
 # Build the application
 RUN npm run build
 
-# Production stage
+# Production stage - serve static files only
 FROM nginx:alpine AS production
 
 # Copy built application from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy custom nginx config for SPA
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Use default nginx config (no custom routing needed)
+# Host nginx will handle all routing and proxying
 
 # Expose port
 EXPOSE 80

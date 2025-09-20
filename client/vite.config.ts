@@ -7,6 +7,12 @@ export default defineConfig({
   server: {
     host: "0.0.0.0", // Allow external connections
     port: 5173,
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1",
+      "chat.aisolved.com.au",
+      "3.106.199.141",
+    ],
     watch: {
       usePolling: true, // Enable polling for file changes in Docker
     },

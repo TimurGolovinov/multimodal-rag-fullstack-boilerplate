@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { DocumentController } from "../controllers/documentController";
-import { requireAuth } from "../middleware/authMiddleware";
+import {
+  requireAuth,
+  AuthenticatedRequest,
+} from "../middleware/authMiddleware";
 import { FileValidationService } from "../services/fileValidationService";
 import multer from "multer";
 
@@ -97,56 +100,64 @@ export function createDocumentRoutes(
   });
 
   // Debug endpoint to check stored file size
-  router.get("/debug/:id", requireAuth, async (req: any, res) => {
-    try {
-      // Get document from database directly
-      const {
-        DocumentDatabaseService,
-      } = require("../database/services/documentService");
-      const dbService = new DocumentDatabaseService();
-      const document = await dbService.getDocument(
-        req.params.id,
-        req.user?.userId
-      );
+  router.get(
+    "/debug/:id",
+    requireAuth,
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        // Get document from database directly
+        const {
+          DocumentDatabaseService,
+        } = require("../database/services/documentService");
+        const dbService = new DocumentDatabaseService();
+        const document = await dbService.getDocument(
+          req.params.id,
+          req.user?.userId
+        );
 
-      if (document) {
-        // Check actual file size on disk
-        const fs = require("fs");
-        const path = require("path");
-        const fullPath = path.join(process.cwd(), "uploads", document.filePath);
-        if (fs.existsSync(fullPath)) {
-          const stats = fs.statSync(fullPath);
-          res.json({
-            success: true,
-            document: {
-              id: document.id,
-              filename: document.filename,
-              storedFileSize: document.fileSize,
-              actualFileSize: stats.size,
-              sizeMatch: document.fileSize === stats.size,
-              filePath: document.filePath,
-            },
-          });
+        if (document) {
+          // Check actual file size on disk
+          const fs = require("fs");
+          const path = require("path");
+          const fullPath = path.join(
+            process.cwd(),
+            "uploads",
+            document.filePath
+          );
+          if (fs.existsSync(fullPath)) {
+            const stats = fs.statSync(fullPath);
+            res.json({
+              success: true,
+              document: {
+                id: document.id,
+                filename: document.filename,
+                storedFileSize: document.fileSize,
+                actualFileSize: stats.size,
+                sizeMatch: document.fileSize === stats.size,
+                filePath: document.filePath,
+              },
+            });
+          } else {
+            res.status(404).json({
+              success: false,
+              message: "File not found on disk",
+            });
+          }
         } else {
           res.status(404).json({
             success: false,
-            message: "File not found on disk",
+            message: "Document not found",
           });
         }
-      } else {
-        res.status(404).json({
+      } catch (error) {
+        res.status(500).json({
           success: false,
-          message: "Document not found",
+          message: "Error checking file size",
+          error: error instanceof Error ? error.message : "Unknown error",
         });
       }
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Error checking file size",
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
     }
-  });
+  );
 
   return router;
 }

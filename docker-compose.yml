@@ -48,10 +48,11 @@ services:
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      target: development
       args:
         VITE_API_BASE: ${VITE_API_BASE:-http://localhost:3000}
-        BUILD_COMMAND: "build:fast"
+        NODE_ENV: development
     container_name: rag-client
     ports:
       - "5173:5173" # Expose Vite dev server port
@@ -81,7 +82,7 @@ services:
         - action: rebuild
           path: ./client/package-lock.json
         - action: rebuild
-          path: ./client/Dockerfile.dev
+          path: ./client/Dockerfile
         - action: sync
           path: ./client/src
           target: /app/src
@@ -144,42 +145,6 @@ services:
       retries: 3
       start_period: 40s
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: rag-nginx
-    volumes:
-      - ./nginx/nginx.server.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - app_uploads:/var/www/rag-app:ro
-      - nginx_logs:/var/log/nginx
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - rag-network
-    depends_on:
-      app:
-        condition: service_healthy
-      client:
-        condition: service_started
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost/health",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Certbot for Let's Encrypt
   certbot:
     image: certbot/certbot
@@ -229,8 +194,7 @@ volumes:
     driver: local
   app_logs:
     driver: local
-  nginx_logs:
-    driver: local
+  # nginx_logs volume removed - nginx runs on host
   certbot_www:
     driver: local
   certbot_conf:
